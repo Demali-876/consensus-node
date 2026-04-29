@@ -16,9 +16,18 @@ interface ReleaseOptions {
 
 const rootDir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 
+interface PackageJson {
+  version?: string;
+  consensus_node?: {
+    commit?: string;
+    platform?: string;
+  };
+  [key: string]: unknown;
+}
+
 async function main(): Promise<void> {
   const options = parseArgs(process.argv.slice(2));
-  const packageJson = JSON.parse(await fs.readFile(path.join(rootDir, "package.json"), "utf8")) as { version?: string };
+  const packageJson = JSON.parse(await fs.readFile(path.join(rootDir, "package.json"), "utf8")) as PackageJson;
 
   const version = options.version ?? process.env.CONSENSUS_NODE_VERSION ?? packageJson.version ?? "0.0.0";
   const commit = options.commit ?? process.env.CONSENSUS_NODE_COMMIT ?? await gitCommit();
@@ -32,7 +41,7 @@ async function main(): Promise<void> {
 
   try {
     const stageDir = path.join(tempDir, "consensus-node");
-    await stagePackage(stageDir);
+    await stagePackage(stageDir, { version, commit, platform });
     await createTarball(stageDir, artifactPath);
 
     const sha256 = await fileSha256(artifactPath);
@@ -101,7 +110,7 @@ function parseBoolean(value: string): boolean {
   throw new Error(`Expected boolean value, got: ${value}`);
 }
 
-async function stagePackage(stageDir: string): Promise<void> {
+async function stagePackage(stageDir: string, release: { version: string; commit: string; platform: string }): Promise<void> {
   await fs.mkdir(stageDir, { recursive: true });
   for (const entry of ["src", "bin", "package.json", "tsconfig.json", "bun.lock", "README.md"]) {
     await fs.cp(path.join(rootDir, entry), path.join(stageDir, entry), {
@@ -110,6 +119,16 @@ async function stagePackage(stageDir: string): Promise<void> {
         !source.includes(`${path.sep}dist${path.sep}`),
     });
   }
+
+  const packagePath = path.join(stageDir, "package.json");
+  const packageJson = JSON.parse(await fs.readFile(packagePath, "utf8")) as PackageJson;
+  packageJson.version = release.version;
+  packageJson.consensus_node = {
+    ...packageJson.consensus_node,
+    commit: release.commit,
+    platform: release.platform,
+  };
+  await fs.writeFile(packagePath, `${JSON.stringify(packageJson, null, 2)}\n`, "utf8");
 }
 
 async function createTarball(stageDir: string, artifactPath: string): Promise<void> {

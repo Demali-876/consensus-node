@@ -10,6 +10,7 @@ interface PackageJson {
 }
 
 const rootDir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
+const SEMVER_PATTERN = /^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)(?:-((?:0|[1-9]\d*|\d*[A-Za-z-][0-9A-Za-z-]*)(?:\.(?:0|[1-9]\d*|\d*[A-Za-z-][0-9A-Za-z-]*))*))?(?:\+([0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*))?$/;
 
 async function main(): Promise<void> {
   const requested = process.argv[2];
@@ -52,7 +53,7 @@ function normalizeVersion(value: string): string {
 }
 
 function parseVersion(value: string): { major: number; minor: number; patch: number; prerelease?: string } {
-  const match = /^(\d+)\.(\d+)\.(\d+)(?:-([0-9A-Za-z.-]+))?$/.exec(value);
+  const match = SEMVER_PATTERN.exec(value);
   if (!match) throw new Error(`Invalid semver version: ${value}`);
   return {
     major: Number(match[1]),

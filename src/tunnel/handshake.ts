@@ -163,7 +163,10 @@ export async function deriveClientSessionFromAccept(input: {
   serverPublicKeyPem?: string;
 }): Promise<SecureSession> {
   assertHandshakeAccept(input.accept);
-  if (input.serverPublicKeyPem && input.accept.signature) {
+  if (input.serverPublicKeyPem) {
+    if (!input.accept.signature) {
+      throw new Error("Server handshake signature is required when server public key pinning is configured");
+    }
     const verified = verifyUtf8(
       input.serverPublicKeyPem,
       handshakeSigningPayload(withoutSignature(input.accept)),
