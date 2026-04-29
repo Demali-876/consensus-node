@@ -1,0 +1,120 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Release version without the v prefix"
+        required: true
+        type: string
+      required:
+        description: "Mark this manifest required when posting to the server"
+        required: false
+        default: true
+        type: boolean
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    name: Build node release
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        platform:
+          - darwin-arm64
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+
+      - name: Typecheck
+        run: bun run typecheck
+
+      - name: Test crypto
+        run: bun run test:secure-channel
+
+      - name: Test handshake
+        run: bun run test:handshake
+
+      - name: Test registration payload
+        run: bun run test:register
+
+      - name: Test eval tunnel client
+        run: bun run test:eval-client
+
+      - name: Test control tunnel client
+        run: bun run test:control-client
+
+      - name: Resolve release version
+        id: version
+        shell: bash
+        run: |
+          if [[ "${GITHUB_REF_TYPE}" == "tag" ]]; then
+            VERSION="${GITHUB_REF_NAME#v}"
+          else
+            VERSION="${{ inputs.version }}"
+          fi
+          echo "version=${VERSION}" >> "${GITHUB_OUTPUT}"
+
+      - name: Build artifact and manifest
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+          PLATFORM: ${{ matrix.platform }}
+          COMMIT: ${{ github.sha }}
+          REPOSITORY: ${{ github.repository }}
+        run: |
+          ARTIFACT="consensus-node-${VERSION}-${PLATFORM}.tgz"
+          DOWNLOAD_URL="https://github.com/${REPOSITORY}/releases/download/v${VERSION}/${ARTIFACT}"
+          bun run release -- \
+            --version "${VERSION}" \
+            --commit "${COMMIT}" \
+            --platform "${PLATFORM}" \
+            --download-url "${DOWNLOAD_URL}" \
+            --out dist
+
+      - name: Upload workflow artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: consensus-node-${{ steps.version.outputs.version }}-${{ matrix.platform }}
+          path: |
+            dist/*.tgz
+            dist/*.json
+
+      - name: Publish GitHub release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v${{ steps.version.outputs.version }}
+          files: |
+            dist/*.tgz
+            dist/*.manifest.json
+            dist/*.admin-manifest.json
+          generate_release_notes: true
+
+      - name: Post manifest to Consensus server
+        env:
+          CONSENSUS_SERVER_URL: ${{ secrets.CONSENSUS_SERVER_URL }}
+          CONSENSUS_ADMIN_KEY: ${{ secrets.CONSENSUS_ADMIN_KEY }}
+          VERSION: ${{ steps.version.outputs.version }}
+          PLATFORM: ${{ matrix.platform }}
+        run: |
+          if [[ -z "${CONSENSUS_SERVER_URL}" || -z "${CONSENSUS_ADMIN_KEY}" ]]; then
+            echo "Skipping server manifest publish because CONSENSUS_SERVER_URL or CONSENSUS_ADMIN_KEY is not set."
+            exit 0
+          fi
+
+          curl --fail-with-body \
+            -H "content-type: application/json" \
+            -H "x-admin-key: ${CONSENSUS_ADMIN_KEY}" \
+            --data-binary "@dist/consensus-node-${VERSION}-${PLATFORM}.admin-manifest.json" \
+            "${CONSENSUS_SERVER_URL%/}/admin/manifest"
