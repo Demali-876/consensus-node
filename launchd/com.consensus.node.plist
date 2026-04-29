@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN"
+  "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>Label</key>
+  <string>com.consensus.node</string>
+
+  <key>ProgramArguments</key>
+  <array>
+    <string>/bin/zsh</string>
+    <string>-lc</string>
+    <string>${HOME}/.consensus/node-runtime/current/scripts/run-control.sh</string>
+  </array>
+
+  <key>EnvironmentVariables</key>
+  <dict>
+    <key>CONSENSUS_STATE_DIR</key>
+    <string>${HOME}/.consensus/node</string>
+    <key>CONSENSUS_NODE_INSTALL_DIR</key>
+    <string>${HOME}/.consensus/node-runtime</string>
+    <key>CONSENSUS_NODE_UPDATE_COMMAND</key>
+    <string>${HOME}/.consensus/node-runtime/current/scripts/install-release.sh</string>
+  </dict>
+
+  <key>KeepAlive</key>
+  <true/>
+
+  <key>RunAtLoad</key>
+  <true/>
+
+  <key>StandardOutPath</key>
+  <string>${HOME}/.consensus/node/control.out.log</string>
+
+  <key>StandardErrorPath</key>
+  <string>${HOME}/.consensus/node/control.err.log</string>
+</dict>
+</plist>

@@ -93,6 +93,14 @@ bun run update -- --download
 
 ## Release Build
 
+Version bumps are explicit commits. Normal commits do not publish releases.
+
+```bash
+bun run version:bump -- patch
+git add package.json
+git commit -m "Bump node version"
+```
+
 Build a node artifact and matching server admin manifest payload:
 
 ```bash
@@ -106,3 +114,54 @@ bun run release -- \
 The command writes the tarball, manifest, and `/admin/manifest` payload into
 `dist/`. Upload the tarball to the `download_url`, then post the admin payload
 to the Pi server with `x-admin-key`.
+
+GitHub releases are manual. Run the `Release` workflow from GitHub Actions when
+you want to publish a real node artifact. If no version is provided in the
+workflow form, it uses the committed `package.json` version. The workflow does
+not run on ordinary commits.
+
+## Server-Directed Updates
+
+The Consensus server decides when a node should update. It sends
+`update_prepare` over the encrypted control tunnel; the node downloads and
+verifies the release artifact, then replies `update_ready`. The server drains the
+node from routing and sends `update_apply` only when the router sees the node as
+idle.
+
+On apply, the node acknowledges, closes its control tunnel, and exits. In
+production, run the node under a process manager. If
+`CONSENSUS_NODE_UPDATE_COMMAND` is set, the node runs it before exiting with:
+
+```txt
+CONSENSUS_NODE_UPDATE_ID
+CONSENSUS_NODE_ARTIFACT_PATH
+CONSENSUS_NODE_TARGET_VERSION
+```
+
+That command should install the verified artifact and let the process manager
+restart the node.
+
+The default installer contract is:
+
+```bash
+export CONSENSUS_NODE_INSTALL_DIR="$HOME/.consensus/node-runtime"
+export CONSENSUS_NODE_UPDATE_COMMAND="$CONSENSUS_NODE_INSTALL_DIR/current/scripts/install-release.sh"
+```
+
+`scripts/install-release.sh` unpacks the verified tarball into
+`$CONSENSUS_NODE_INSTALL_DIR/releases/`, installs production dependencies with
+the lockfile, and atomically moves the `current` symlink. `scripts/run-control.sh`
+always starts `bun run control` from that `current` release.
+
+For the first install, download a release tarball and run:
+
+```bash
+CONSENSUS_NODE_ARTIFACT_PATH=/path/to/consensus-node.tgz \
+CONSENSUS_NODE_TARGET_VERSION=0.1.0-alpha.0 \
+scripts/install-release.sh
+```
+
+Then run the node under a process manager using the templates in `launchd/` or
+`systemd/`. On macOS, copy `launchd/com.consensus.node.plist`, replace the
+`${HOME}` placeholders with the absolute home path, then load it with
+`launchctl`.

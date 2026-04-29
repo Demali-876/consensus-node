@@ -1,14 +1,12 @@
 name: Release
 
 on:
-  push:
-    tags:
-      - "v*"
   workflow_dispatch:
     inputs:
       version:
-        description: "Release version without the v prefix"
-        required: true
+        description: "Optional release version without the v prefix. Defaults to package.json."
+        required: false
+        default: ""
         type: string
       required:
         description: "Mark this manifest required when posting to the server"
@@ -60,10 +58,9 @@ jobs:
         id: version
         shell: bash
         run: |
-          if [[ "${GITHUB_REF_TYPE}" == "tag" ]]; then
-            VERSION="${GITHUB_REF_NAME#v}"
-          else
-            VERSION="${{ inputs.version }}"
+          VERSION="${{ inputs.version }}"
+          if [[ -z "${VERSION}" ]]; then
+            VERSION="$(bun -e "console.log(require('./package.json').version)")"
           fi
           echo "version=${VERSION}" >> "${GITHUB_OUTPUT}"
 
@@ -81,6 +78,7 @@ jobs:
             --commit "${COMMIT}" \
             --platform "${PLATFORM}" \
             --download-url "${DOWNLOAD_URL}" \
+            --required "${{ inputs.required }}" \
             --out dist
 
       - name: Upload workflow artifacts

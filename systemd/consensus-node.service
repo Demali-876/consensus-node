@@ -1,0 +1,19 @@
+[Unit]
+Description=Consensus Node Control Tunnel
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+EnvironmentFile=-/etc/consensus-node.env
+Environment=CONSENSUS_STATE_DIR=/var/lib/consensus-node/state
+Environment=CONSENSUS_NODE_INSTALL_DIR=/opt/consensus-node
+Environment=CONSENSUS_NODE_UPDATE_COMMAND=/opt/consensus-node/current/scripts/install-release.sh
+ExecStart=/opt/consensus-node/current/scripts/run-control.sh
+Restart=always
+RestartSec=5
+KillSignal=SIGTERM
+TimeoutStopSec=30
+
+[Install]
+WantedBy=multi-user.target

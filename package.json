@@ -15,6 +15,7 @@
     "verify": "bun src/verify.ts",
     "update": "bun src/update.ts",
     "release": "bun src/release.ts",
+    "version:bump": "bun src/version.ts",
     "test:secure-channel": "bun src/tests/secure-channel.test.ts",
     "test:handshake": "bun src/tests/handshake.test.ts",
     "test:eval-client": "bun src/tests/eval-client.test.ts",

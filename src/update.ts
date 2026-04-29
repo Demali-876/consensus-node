@@ -5,7 +5,7 @@ import { releaseManifest } from "./node/manifest";
 import { ensureState } from "./node/state";
 import type { ReleaseManifest } from "./types";
 
-interface UpdateStatus {
+export interface UpdateStatus {
   update_required: boolean;
   current: ReleaseManifest;
   required: ReleaseManifest;
@@ -40,7 +40,7 @@ async function main(): Promise<void> {
   }, null, 2));
 }
 
-async function fetchRequiredManifest(serverUrl: string): Promise<ReleaseManifest> {
+export async function fetchRequiredManifest(serverUrl: string): Promise<ReleaseManifest> {
   const response = await fetch(`${trimTrailingSlash(serverUrl)}/update/latest`, {
     signal: AbortSignal.timeout(30_000),
   });
@@ -73,7 +73,7 @@ export function compareManifests(current: ReleaseManifest, required: ReleaseMani
   };
 }
 
-async function downloadAndVerify(manifest: ReleaseManifest): Promise<{ path: string; sha256: string }> {
+export async function downloadAndVerify(manifest: ReleaseManifest): Promise<{ path: string; sha256: string }> {
   if (!manifest.download_url) {
     throw new Error("Required manifest does not include download_url");
   }
@@ -108,7 +108,9 @@ function trimTrailingSlash(value: string): string {
   return value.replace(/\/+$/, "");
 }
 
-main().catch((error) => {
-  console.error("Update failed:", error);
-  process.exit(1);
-});
+if (import.meta.main) {
+  main().catch((error) => {
+    console.error("Update failed:", error);
+    process.exit(1);
+  });
+}
