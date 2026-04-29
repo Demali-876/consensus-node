@@ -10,6 +10,7 @@ interface ReleaseOptions {
   commit?: string;
   platform?: string;
   downloadUrl?: string;
+  required: boolean;
   outDir: string;
 }
 
@@ -45,7 +46,7 @@ async function main(): Promise<void> {
     const manifestPath = path.join(outDir, `consensus-node-${version}-${platform}.manifest.json`);
     const adminPayloadPath = path.join(outDir, `consensus-node-${version}-${platform}.admin-manifest.json`);
     await fs.writeFile(manifestPath, JSON.stringify(manifest, null, 2), "utf8");
-    await fs.writeFile(adminPayloadPath, JSON.stringify({ manifest, required: true }, null, 2), "utf8");
+    await fs.writeFile(adminPayloadPath, JSON.stringify({ manifest, required: options.required }, null, 2), "utf8");
 
     console.log(JSON.stringify({
       artifact: artifactPath,
@@ -61,6 +62,7 @@ async function main(): Promise<void> {
 
 function parseArgs(args: string[]): ReleaseOptions {
   const options: ReleaseOptions = {
+    required: true,
     outDir: "dist",
   };
 
@@ -79,6 +81,9 @@ function parseArgs(args: string[]): ReleaseOptions {
     } else if (arg === "--download-url" && next) {
       options.downloadUrl = next;
       i += 1;
+    } else if (arg === "--required" && next) {
+      options.required = parseBoolean(next);
+      i += 1;
     } else if (arg === "--out" && next) {
       options.outDir = next;
       i += 1;
@@ -88,6 +93,12 @@ function parseArgs(args: string[]): ReleaseOptions {
   }
 
   return options;
+}
+
+function parseBoolean(value: string): boolean {
+  if (value === "true") return true;
+  if (value === "false") return false;
+  throw new Error(`Expected boolean value, got: ${value}`);
 }
 
 async function stagePackage(stageDir: string): Promise<void> {

@@ -93,6 +93,14 @@ bun run update -- --download
 
 ## Release Build
 
+Version bumps are explicit commits. Normal commits do not publish releases.
+
+```bash
+bun run version:bump -- patch
+git add package.json
+git commit -m "Bump node version"
+```
+
 Build a node artifact and matching server admin manifest payload:
 
 ```bash
@@ -106,3 +114,8 @@ bun run release -- \
 The command writes the tarball, manifest, and `/admin/manifest` payload into
 `dist/`. Upload the tarball to the `download_url`, then post the admin payload
 to the Pi server with `x-admin-key`.
+
+GitHub releases are manual. Run the `Release` workflow from GitHub Actions when
+you want to publish a real node artifact. If no version is provided in the
+workflow form, it uses the committed `package.json` version. The workflow does
+not run on ordinary commits.
