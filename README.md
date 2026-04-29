@@ -140,3 +140,28 @@ CONSENSUS_NODE_TARGET_VERSION
 
 That command should install the verified artifact and let the process manager
 restart the node.
+
+The default installer contract is:
+
+```bash
+export CONSENSUS_NODE_INSTALL_DIR="$HOME/.consensus/node-runtime"
+export CONSENSUS_NODE_UPDATE_COMMAND="$CONSENSUS_NODE_INSTALL_DIR/current/scripts/install-release.sh"
+```
+
+`scripts/install-release.sh` unpacks the verified tarball into
+`$CONSENSUS_NODE_INSTALL_DIR/releases/`, installs production dependencies with
+the lockfile, and atomically moves the `current` symlink. `scripts/run-control.sh`
+always starts `bun run control` from that `current` release.
+
+For the first install, download a release tarball and run:
+
+```bash
+CONSENSUS_NODE_ARTIFACT_PATH=/path/to/consensus-node.tgz \
+CONSENSUS_NODE_TARGET_VERSION=0.1.0-alpha.0 \
+scripts/install-release.sh
+```
+
+Then run the node under a process manager using the templates in `launchd/` or
+`systemd/`. On macOS, copy `launchd/com.consensus.node.plist`, replace the
+`${HOME}` placeholders with the absolute home path, then load it with
+`launchctl`.
