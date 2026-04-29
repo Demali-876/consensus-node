@@ -21,6 +21,10 @@ export const MESSAGE_TYPE = {
   STREAM_OPEN:    "stream_open",
   STREAM_DATA:    "stream_data",
   STREAM_CLOSE:   "stream_close",
+  UPDATE_PREPARE: "update_prepare",
+  UPDATE_READY:   "update_ready",
+  UPDATE_APPLY:   "update_apply",
+  UPDATE_FAILED:  "update_failed",
   ACK:            "ack",
   ERROR:          "error",
 } as const;
@@ -151,6 +155,36 @@ export interface StreamCloseMessage extends BaseMessage {
   reason?: string;
 }
 
+export interface UpdatePrepareMessage extends BaseMessage {
+  type: typeof MESSAGE_TYPE.UPDATE_PREPARE;
+  update_id: string;
+  manifest: import("../types").ReleaseManifest;
+}
+
+export interface UpdateReadyMessage extends BaseMessage {
+  type: typeof MESSAGE_TYPE.UPDATE_READY;
+  reply_to: string;
+  update_id: string;
+  artifact_path: string;
+  sha256: string;
+  current_version: string;
+  target_version: string;
+}
+
+export interface UpdateApplyMessage extends BaseMessage {
+  type: typeof MESSAGE_TYPE.UPDATE_APPLY;
+  update_id: string;
+  restart_after_ms?: number;
+}
+
+export interface UpdateFailedMessage extends BaseMessage {
+  type: typeof MESSAGE_TYPE.UPDATE_FAILED;
+  reply_to?: string;
+  update_id: string;
+  code: string;
+  message: string;
+}
+
 export interface AckMessage extends BaseMessage {
   type: typeof MESSAGE_TYPE.ACK;
   reply_to: string;
@@ -179,6 +213,10 @@ export type TunnelMessage =
   | StreamOpenMessage
   | StreamDataMessage
   | StreamCloseMessage
+  | UpdatePrepareMessage
+  | UpdateReadyMessage
+  | UpdateApplyMessage
+  | UpdateFailedMessage
   | AckMessage
   | ErrorMessage;
 

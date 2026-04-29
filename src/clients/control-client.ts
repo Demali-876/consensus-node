@@ -6,6 +6,8 @@ import { executeProxyCommand } from "../runtime/proxy-command";
 import { executeProxySessionMessage } from "../runtime/proxy-session";
 import { connectEncryptedTunnel } from "../tunnel/connect";
 import { MESSAGE_TYPE, TUNNEL_MODE, createErrorMessage, nowSeconds } from "../tunnel/messages";
+import { compareManifests, downloadAndVerify } from "../update";
+import type { ReleaseManifest } from "../types";
 
 export interface ControlClientOptions {
   gatewayUrl: string;
@@ -30,6 +32,15 @@ export async function startControlClient(options: ControlClientOptions) {
   });
 
   const heartbeatIntervalMs = options.heartbeatIntervalMs ?? 30_000;
+  let activeRequests = 0;
+  const activeStreams = new Set<string>();
+  let preparedUpdate: {
+    updateId: string;
+    manifest: ReleaseManifest;
+    artifactPath: string;
+    sha256: string;
+  } | null = null;
+
   const sendHeartbeat = async () => {
     await connected.client.send({
       type: MESSAGE_TYPE.HEARTBEAT,
@@ -37,6 +48,8 @@ export async function startControlClient(options: ControlClientOptions) {
       node_id: nodeId,
       uptime_seconds: Math.floor(process.uptime()),
       capabilities: capabilitiesRecord(),
+      active_requests: activeRequests,
+      active_streams: activeStreams.size,
     });
   };
 
@@ -53,6 +66,7 @@ export async function startControlClient(options: ControlClientOptions) {
 
   connected.client.onMessage(async (message, client) => {
     if (message.type === MESSAGE_TYPE.PROXY_REQUEST) {
+      activeRequests += 1;
       try {
         await client.send(await executeProxyCommand(message));
       } catch (error) {
@@ -61,6 +75,8 @@ export async function startControlClient(options: ControlClientOptions) {
           code: "proxy_failed",
           message: error instanceof Error ? error.message : String(error),
         }));
+      } finally {
+        activeRequests = Math.max(0, activeRequests - 1);
       }
       return;
     }
@@ -72,18 +88,104 @@ export async function startControlClient(options: ControlClientOptions) {
           message: `Unsupported stream target: ${message.target ?? ""}`,
         }));
       }
+      activeStreams.add(message.stream_id);
       return;
     }
 
     if (message.type === MESSAGE_TYPE.STREAM_DATA) {
-      const output = await executeProxySessionMessage(Buffer.from(message.data, "base64"));
+      activeRequests += 1;
+      try {
+        const output = await executeProxySessionMessage(Buffer.from(message.data, "base64"));
+        await client.send({
+          type: MESSAGE_TYPE.STREAM_DATA,
+          timestamp: nowSeconds(),
+          stream_id: message.stream_id,
+          data: output.toString("base64"),
+          encoding: "base64",
+        });
+      } finally {
+        activeRequests = Math.max(0, activeRequests - 1);
+      }
+      return;
+    }
+
+    if (message.type === MESSAGE_TYPE.STREAM_CLOSE) {
+      activeStreams.delete(message.stream_id);
+      return;
+    }
+
+    if (message.type === MESSAGE_TYPE.UPDATE_PREPARE) {
+      try {
+        const current = releaseManifest();
+        const status = compareManifests(current, message.manifest);
+        const downloaded = status.update_required
+          ? await downloadAndVerify(message.manifest)
+          : { path: "", sha256: current.tarball_sha256 ?? "" };
+        preparedUpdate = {
+          updateId: message.update_id,
+          manifest: message.manifest,
+          artifactPath: downloaded.path,
+          sha256: downloaded.sha256,
+        };
+        await client.send({
+          type: MESSAGE_TYPE.UPDATE_READY,
+          timestamp: nowSeconds(),
+          reply_to: message.id ?? message.update_id,
+          update_id: message.update_id,
+          artifact_path: downloaded.path,
+          sha256: downloaded.sha256,
+          current_version: current.version,
+          target_version: message.manifest.version,
+        });
+      } catch (error) {
+        await client.send({
+          type: MESSAGE_TYPE.UPDATE_FAILED,
+          timestamp: nowSeconds(),
+          reply_to: message.id,
+          update_id: message.update_id,
+          code: "prepare_failed",
+          message: error instanceof Error ? error.message : String(error),
+        });
+      }
+      return;
+    }
+
+    if (message.type === MESSAGE_TYPE.UPDATE_APPLY) {
+      if (!preparedUpdate || preparedUpdate.updateId !== message.update_id) {
+        await client.send({
+          type: MESSAGE_TYPE.UPDATE_FAILED,
+          timestamp: nowSeconds(),
+          update_id: message.update_id,
+          code: "update_not_prepared",
+          message: "No matching prepared update is available",
+        });
+        return;
+      }
+
       await client.send({
-        type: MESSAGE_TYPE.STREAM_DATA,
+        type: MESSAGE_TYPE.ACK,
         timestamp: nowSeconds(),
-        stream_id: message.stream_id,
-        data: output.toString("base64"),
-        encoding: "base64",
+        reply_to: message.id ?? message.update_id,
       });
+
+      const restartAfterMs = Math.max(0, message.restart_after_ms ?? 1_000);
+      setTimeout(() => {
+        connected.client.close(1012, "node update apply requested");
+        const command = process.env.CONSENSUS_NODE_UPDATE_COMMAND;
+        if (command) {
+          Bun.spawn(["sh", "-lc", command], {
+            env: {
+              ...process.env,
+              CONSENSUS_NODE_UPDATE_ID: preparedUpdate!.updateId,
+              CONSENSUS_NODE_ARTIFACT_PATH: preparedUpdate!.artifactPath,
+              CONSENSUS_NODE_TARGET_VERSION: preparedUpdate!.manifest.version,
+            },
+            stdout: "inherit",
+            stderr: "inherit",
+          });
+        }
+        process.exit(0);
+      }, restartAfterMs).unref();
     }
   });
 
