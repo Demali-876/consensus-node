@@ -61,7 +61,6 @@ async function main(): Promise<void> {
     const solana = await requiredQuestion(rl, "Solana address");
     const icp = await requiredQuestion(rl, "ICP address");
     const port = await question(rl, "Node local port", "9090");
-    const testEndpoint = await requiredQuestion(rl, "Public benchmark endpoint URL");
 
     await runBunInCurrent(installDir, ["run", "register"], {
       CONSENSUS_SERVER_URL: serverUrl,
@@ -69,7 +68,6 @@ async function main(): Promise<void> {
       CONSENSUS_NODE_IPV4: publicIpv4,
       ...(publicIpv6 ? { CONSENSUS_NODE_IPV6: publicIpv6 } : {}),
       CONSENSUS_NODE_PORT: port,
-      CONSENSUS_NODE_TEST_ENDPOINT: testEndpoint,
       CONSENSUS_NODE_CONTACT: contact,
       CONSENSUS_EMAIL_VERIFICATION_TOKEN: emailToken,
       CONSENSUS_EVM_ADDRESS: evm,

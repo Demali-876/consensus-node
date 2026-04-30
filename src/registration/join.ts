@@ -7,7 +7,6 @@ export interface RegisterNodeOptions {
   ipv4: string;
   ipv6?: string | null;
   port: number;
-  testEndpoint: string;
   contact: string;
   emailVerificationToken: string;
   evmAddress: string;
@@ -20,7 +19,6 @@ export interface JoinPayload {
   ipv4: string;
   ipv6?: string | null;
   port: number;
-  test_endpoint: string;
   contact: string;
   email_verification_token: string;
   evm_address: string;
@@ -100,7 +98,6 @@ export function buildJoinPayload(input: {
     ipv4: input.options.ipv4,
     ipv6: input.options.ipv6 ?? null,
     port: input.options.port,
-    test_endpoint: input.options.testEndpoint,
     contact: input.options.contact,
     email_verification_token: input.options.emailVerificationToken,
     evm_address: input.options.evmAddress,
@@ -118,7 +115,6 @@ export function optionsFromEnv(env: NodeJS.ProcessEnv = process.env): RegisterNo
     ipv4: requiredEnv(env, "CONSENSUS_NODE_IPV4"),
     ipv6: optionalEnv(env, "CONSENSUS_NODE_IPV6"),
     port: integerEnv(env, "CONSENSUS_NODE_PORT", integerEnv(env, "NODE_PORT", 9090)),
-    testEndpoint: requiredEnv(env, "CONSENSUS_NODE_TEST_ENDPOINT"),
     contact: requiredEnv(env, "CONSENSUS_NODE_CONTACT"),
     emailVerificationToken: requiredEnv(env, "CONSENSUS_EMAIL_VERIFICATION_TOKEN"),
     evmAddress: requiredEnv(env, "CONSENSUS_EVM_ADDRESS"),
