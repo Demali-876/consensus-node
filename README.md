@@ -41,8 +41,9 @@ bun run setup
 
 The setup wizard explains the network commitment, installs the server-approved
 runtime release, detects IPv4/optional IPv6, classifies region through the
-Consensus server, verifies contact email, runs encrypted eval, and registers the
-node.
+Consensus server, runs encrypted eval, verifies contact email, and registers the
+node. Email verification happens after eval so failed nodes do not spend an
+email API call.
 
 First run encrypted eval against the public server tunnel. A passing eval writes
 `join-auth.json` into the node state directory.
@@ -61,8 +62,8 @@ CONSENSUS_NODE_IPV6=... \
 CONSENSUS_NODE_IPV4=... \
 CONSENSUS_NODE_PORT=9090 \
 CONSENSUS_NODE_TEST_ENDPOINT=https://your-node.example.com/health \
-CONSENSUS_NODE_REGION=us-east-1 \
 CONSENSUS_NODE_CONTACT=ops@example.com \
+CONSENSUS_EMAIL_VERIFICATION_TOKEN=... \
 CONSENSUS_EVM_ADDRESS=0x... \
 CONSENSUS_SOLANA_ADDRESS=... \
 CONSENSUS_ICP_ADDRESS=... \

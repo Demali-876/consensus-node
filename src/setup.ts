@@ -47,14 +47,14 @@ async function main(): Promise<void> {
     console.log(`  IPv6: ${publicIpv6 ?? "(none detected)"}`);
     if (region) console.log(`  region: ${region.region} (${region.city ?? "unknown"}, ${region.country_code})`);
 
-    const contact = await requiredQuestion(rl, "Contact email");
-    const emailToken = await verifyEmail(rl, serverUrl, contact);
-
     console.log("\nRunning encrypted evaluation. This may take a moment.");
     await runBunInCurrent(installDir, ["run", "eval"], {
       CONSENSUS_SERVER_URL: serverUrl,
       CONSENSUS_STATE_DIR: stateDir(),
     });
+
+    const contact = await requiredQuestion(rl, "Contact email");
+    const emailToken = await verifyEmail(rl, serverUrl, contact);
 
     console.log("\nRegistration requires payout addresses.");
     const evm = await requiredQuestion(rl, "EVM address");
