@@ -32,6 +32,24 @@ CONSENSUS_STATE_DIR=/path/to/state bun run start
 
 ## Join Flow
 
+Recommended interactive setup:
+
+```bash
+bun install
+bun run setup
+```
+
+The setup wizard explains the network commitment, installs the server-approved
+runtime release, detects IPv4/optional IPv6, classifies region through the
+Consensus server, runs encrypted eval, verifies contact email, and registers the
+node. Email verification happens after eval so failed nodes do not spend an
+email API call.
+
+Node evaluation checks route integrity, system capacity, SHA-256 CPU throughput,
+ChaCha20-Poly1305 throughput, and memory pressure before registration continues.
+Registration consumes the encrypted eval authorization; it does not require
+port forwarding or a public benchmark endpoint.
+
 First run encrypted eval against the public server tunnel. A passing eval writes
 `join-auth.json` into the node state directory.
 
@@ -48,9 +66,8 @@ CONSENSUS_SERVER_URL=https://consensus.canister.software \
 CONSENSUS_NODE_IPV6=... \
 CONSENSUS_NODE_IPV4=... \
 CONSENSUS_NODE_PORT=9090 \
-CONSENSUS_NODE_TEST_ENDPOINT=https://your-node.example.com/health \
-CONSENSUS_NODE_REGION=us-east-1 \
 CONSENSUS_NODE_CONTACT=ops@example.com \
+CONSENSUS_EMAIL_VERIFICATION_TOKEN=... \
 CONSENSUS_EVM_ADDRESS=0x... \
 CONSENSUS_SOLANA_ADDRESS=... \
 CONSENSUS_ICP_ADDRESS=... \

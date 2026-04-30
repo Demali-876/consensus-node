@@ -112,7 +112,7 @@ function parseBoolean(value: string): boolean {
 
 async function stagePackage(stageDir: string, release: { version: string; commit: string; platform: string }): Promise<void> {
   await fs.mkdir(stageDir, { recursive: true });
-  for (const entry of ["src", "bin", "package.json", "tsconfig.json", "bun.lock", "README.md"]) {
+  for (const entry of ["src", "bin", "scripts", "launchd", "systemd", "package.json", "tsconfig.json", "bun.lock", "README.md"]) {
     await fs.cp(path.join(rootDir, entry), path.join(stageDir, entry), {
       recursive: true,
       filter: (source) => !source.includes(`${path.sep}node_modules${path.sep}`) &&
