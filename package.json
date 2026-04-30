@@ -14,6 +14,7 @@
     "register": "bun src/register.ts",
     "verify": "bun src/verify.ts",
     "update": "bun src/update.ts",
+    "setup": "bun src/setup.ts",
     "release": "bun src/release.ts",
     "version:bump": "bun src/version.ts",
     "test:secure-channel": "bun src/tests/secure-channel.test.ts",

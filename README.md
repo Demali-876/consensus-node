@@ -32,6 +32,18 @@ CONSENSUS_STATE_DIR=/path/to/state bun run start
 
 ## Join Flow
 
+Recommended interactive setup:
+
+```bash
+bun install
+bun run setup
+```
+
+The setup wizard explains the network commitment, installs the server-approved
+runtime release, detects IPv4/optional IPv6, classifies region through the
+Consensus server, verifies contact email, runs encrypted eval, and registers the
+node.
+
 First run encrypted eval against the public server tunnel. A passing eval writes
 `join-auth.json` into the node state directory.
 

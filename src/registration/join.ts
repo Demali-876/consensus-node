@@ -4,12 +4,12 @@ import { loadConfig, loadJoinAuthorization, saveConfig, type JoinAuthorization }
 
 export interface RegisterNodeOptions {
   serverUrl: string;
-  ipv6: string;
-  ipv4?: string | null;
+  ipv4: string;
+  ipv6?: string | null;
   port: number;
   testEndpoint: string;
-  region: string;
   contact: string;
+  emailVerificationToken: string;
   evmAddress: string;
   solanaAddress: string;
   icpAddress: string;
@@ -17,12 +17,12 @@ export interface RegisterNodeOptions {
 
 export interface JoinPayload {
   pubkey_ed25519_pem: string;
-  ipv6: string;
-  ipv4?: string | null;
+  ipv4: string;
+  ipv6?: string | null;
   port: number;
   test_endpoint: string;
-  region: string;
   contact: string;
+  email_verification_token: string;
   evm_address: string;
   solana_address: string;
   icp_address: string;
@@ -35,9 +35,10 @@ export interface JoinResponse {
   success: boolean;
   node_id: string;
   domain: string;
-  ipv6: string;
-  ipv4: string | null;
+  ipv4: string;
+  ipv6: string | null;
   port: number;
+  region: string;
   status: string;
   benchmark_score: number;
   join_request_id?: string | null;
@@ -78,7 +79,7 @@ export async function registerNode(options: RegisterNodeOptions): Promise<JoinRe
     ...existing,
     node_id: body.node_id,
     domain: body.domain,
-    region: options.region,
+    region: body.region,
     ipv4: body.ipv4,
     ipv6: body.ipv6,
     port: body.port,
@@ -96,12 +97,12 @@ export function buildJoinPayload(input: {
 }): JoinPayload {
   return {
     pubkey_ed25519_pem: input.publicKeyPem,
-    ipv6: input.options.ipv6,
-    ipv4: input.options.ipv4 ?? null,
+    ipv4: input.options.ipv4,
+    ipv6: input.options.ipv6 ?? null,
     port: input.options.port,
     test_endpoint: input.options.testEndpoint,
-    region: input.options.region,
     contact: input.options.contact,
+    email_verification_token: input.options.emailVerificationToken,
     evm_address: input.options.evmAddress,
     solana_address: input.options.solanaAddress,
     icp_address: input.options.icpAddress,
@@ -114,12 +115,12 @@ export function buildJoinPayload(input: {
 export function optionsFromEnv(env: NodeJS.ProcessEnv = process.env): RegisterNodeOptions {
   return {
     serverUrl: requiredEnv(env, "CONSENSUS_SERVER_URL"),
-    ipv6: requiredEnv(env, "CONSENSUS_NODE_IPV6"),
-    ipv4: optionalEnv(env, "CONSENSUS_NODE_IPV4"),
+    ipv4: requiredEnv(env, "CONSENSUS_NODE_IPV4"),
+    ipv6: optionalEnv(env, "CONSENSUS_NODE_IPV6"),
     port: integerEnv(env, "CONSENSUS_NODE_PORT", integerEnv(env, "NODE_PORT", 9090)),
     testEndpoint: requiredEnv(env, "CONSENSUS_NODE_TEST_ENDPOINT"),
-    region: requiredEnv(env, "CONSENSUS_NODE_REGION"),
     contact: requiredEnv(env, "CONSENSUS_NODE_CONTACT"),
+    emailVerificationToken: requiredEnv(env, "CONSENSUS_EMAIL_VERIFICATION_TOKEN"),
     evmAddress: requiredEnv(env, "CONSENSUS_EVM_ADDRESS"),
     solanaAddress: requiredEnv(env, "CONSENSUS_SOLANA_ADDRESS"),
     icpAddress: requiredEnv(env, "CONSENSUS_ICP_ADDRESS"),
