@@ -24,7 +24,11 @@ export const REQUIRED_ROUTES = [
   "GET /node/capabilities",
   "POST /benchmark/fetch",
   "POST /benchmark/cpu",
+  "POST /benchmark/crypto",
+  "POST /benchmark/concurrency",
   "GET /benchmark/system",
+  "POST /benchmark/memory-test",
+  "POST /benchmark/memory-pressure",
   "POST /proxy"
 ] as const;
 

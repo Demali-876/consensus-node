@@ -45,6 +45,11 @@ Consensus server, runs encrypted eval, verifies contact email, and registers the
 node. Email verification happens after eval so failed nodes do not spend an
 email API call.
 
+Node evaluation checks route integrity, system capacity, SHA-256 CPU throughput,
+ChaCha20-Poly1305 throughput, and memory pressure before registration continues.
+Registration also measures outbound fetch latency and concurrent request
+behavior through the public benchmark endpoint.
+
 First run encrypted eval against the public server tunnel. A passing eval writes
 `join-auth.json` into the node state directory.
 
