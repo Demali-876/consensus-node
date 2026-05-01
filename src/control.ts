@@ -1,4 +1,5 @@
 import { startControlClient } from "./clients/control-client";
+import { log } from "./log";
 
 async function main(): Promise<void> {
   const gatewayUrl = tunnelUrlFromEnv();
@@ -6,22 +7,32 @@ async function main(): Promise<void> {
 
   while (true) {
     try {
+      log.info("control", "connect-start", { gateway_url: gatewayUrl, attempt: attempt + 1 });
       const connected = await startControlClient({ gatewayUrl });
       attempt = 0;
 
-      console.log("Consensus node control tunnel connected");
-      console.log(`node_id=${connected.nodeId}`);
-      console.log(`session_id=${connected.sessionId}`);
+      log.info("control", "connected", {
+        node_id: connected.nodeId,
+        session_id: connected.sessionId,
+      });
 
       const close = await connected.closed;
-      console.error(`Control tunnel closed: ${close.reason ?? close.error.message}`);
+      log.warn("control", "closed", {
+        code: close.code ?? null,
+        reason: close.reason ?? close.error.message,
+      });
     } catch (error) {
-      console.error("Control tunnel failed:", error);
+      log.error("control", "connect-failed", {
+        message: error instanceof Error ? error.message : String(error),
+      });
     }
 
     attempt += 1;
     const delayMs = reconnectDelayMs(attempt);
-    console.error(`Reconnecting control tunnel in ${Math.round(delayMs / 1000)}s`);
+    log.warn("control", "reconnect-scheduled", {
+      attempt,
+      delay_ms: delayMs,
+    });
     await new Promise((resolve) => setTimeout(resolve, delayMs));
   }
 }
@@ -51,6 +62,8 @@ function reconnectDelayMs(attempt: number): number {
 }
 
 main().catch((error) => {
-  console.error("Control tunnel failed:", error);
+  log.error("control", "fatal", {
+    message: error instanceof Error ? error.message : String(error),
+  });
   process.exit(1);
 });

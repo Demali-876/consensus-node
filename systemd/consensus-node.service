@@ -6,6 +6,7 @@ Wants=network-online.target
 [Service]
 Type=simple
 EnvironmentFile=-/etc/consensus-node.env
+Environment=CONSENSUS_SERVER_URL=https://consensus.canister.software
 Environment=CONSENSUS_STATE_DIR=/var/lib/consensus-node/state
 Environment=CONSENSUS_NODE_INSTALL_DIR=/opt/consensus-node
 Environment=CONSENSUS_NODE_UPDATE_COMMAND=/opt/consensus-node/current/scripts/install-release.sh

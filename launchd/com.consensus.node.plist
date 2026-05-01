@@ -15,6 +15,8 @@
 
   <key>EnvironmentVariables</key>
   <dict>
+    <key>CONSENSUS_SERVER_URL</key>
+    <string>https://consensus.canister.software</string>
     <key>CONSENSUS_STATE_DIR</key>
     <string>${HOME}/.consensus/node</string>
     <key>CONSENSUS_NODE_INSTALL_DIR</key>
