@@ -1,4 +1,5 @@
 import { loadOrCreateIdentity, signBytes } from "../crypto/identity";
+import { log } from "../log";
 import { releaseManifest } from "../node/manifest";
 import { saveJoinAuthorization } from "../node/state";
 import { runEvalAction } from "../runtime/eval";
@@ -13,15 +14,24 @@ export interface EvalClientOptions {
 }
 
 export async function startEvalClient(options: EvalClientOptions) {
-  console.log(`Opening encrypted eval tunnel: ${options.gatewayUrl}`);
+  const manifest = releaseManifest();
+  log.info("eval-client", "handshake-start", {
+    gateway_url: options.gatewayUrl,
+    candidate_id: options.candidateId ?? null,
+    version: manifest.version,
+  });
   const connected = await connectEncryptedTunnel({
     url: options.gatewayUrl,
     mode: TUNNEL_MODE.EVAL,
     candidateId: options.candidateId,
-    releaseVersion: releaseManifest().version,
+    releaseVersion: manifest.version,
     requestTimeoutMs: options.requestTimeoutMs,
   });
-  console.log(`Encrypted handshake complete: session ${connected.sessionId}`);
+  log.info("eval-client", "handshake-complete", {
+    session_id: connected.sessionId,
+    candidate_id: options.candidateId ?? null,
+    version: manifest.version,
+  });
 
   connected.client.onMessage(async (message, client) => {
     if (message.type === MESSAGE_TYPE.EVAL_REQUEST) {
@@ -37,7 +47,10 @@ export async function startEvalClient(options: EvalClientOptions) {
 }
 
 async function handleJoinReady(message: JoinReadyMessage): Promise<void> {
-  console.log(`Join authorization received: ${message.join_id}`);
+  log.info("eval-client", "join-ready", {
+    join_id: message.join_id,
+    expires_at: message.expires_at,
+  });
   const identity = await loadOrCreateIdentity();
   const nonce = decodeBase64Url(message.nonce);
   const signature = signBytes(identity.privateKeyPem, nonce);
@@ -59,10 +72,10 @@ function decodeBase64Url(value: string): Buffer {
 }
 
 async function handleEvalRequest(message: EvalRequestMessage, client: TunnelClient): Promise<void> {
-  console.log(`Running eval action: ${message.action}`);
+  log.info("eval-client", "action-start", { action: message.action });
   try {
     const result = await runEvalAction(message.action, message.params ?? {});
-    console.log(`Completed eval action: ${message.action}`);
+    log.info("eval-client", "action-complete", { action: message.action });
     await client.send({
       type: MESSAGE_TYPE.EVAL_RESPONSE,
       timestamp: nowSeconds(),
@@ -72,6 +85,10 @@ async function handleEvalRequest(message: EvalRequestMessage, client: TunnelClie
       result,
     });
   } catch (error) {
+    log.error("eval-client", "action-failed", {
+      action: message.action,
+      message: error instanceof Error ? error.message : String(error),
+    });
     await client.send({
       type: MESSAGE_TYPE.EVAL_RESPONSE,
       timestamp: nowSeconds(),

@@ -4,6 +4,7 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { releaseManifest } from "../node/manifest";
+import { log } from "../log";
 import { loadConfig } from "../node/state";
 import { capabilitiesRecord } from "../runtime/capabilities";
 import { executeProxyCommand } from "../runtime/proxy-command";
@@ -27,12 +28,23 @@ export async function startControlClient(options: ControlClientOptions) {
     throw new Error("Missing node id. Register the node before starting control mode.");
   }
 
+  const manifest = releaseManifest();
+  log.info("control-client", "handshake-start", {
+    node_id: nodeId,
+    gateway_url: options.gatewayUrl,
+    version: manifest.version,
+  });
   const connected = await connectEncryptedTunnel({
     url: options.gatewayUrl,
     mode: TUNNEL_MODE.CONTROL,
     nodeId,
     identity,
-    releaseVersion: releaseManifest().version,
+    releaseVersion: manifest.version,
+  });
+  log.info("control-client", "handshake-complete", {
+    node_id: nodeId,
+    session_id: connected.sessionId,
+    version: manifest.version,
   });
 
   const heartbeatIntervalMs = options.heartbeatIntervalMs ?? 30_000;
@@ -66,15 +78,38 @@ export async function startControlClient(options: ControlClientOptions) {
   });
   connected.client.onClose((event) => {
     clearInterval(timer);
+    log.warn("control-client", "connection-closed", {
+      node_id: nodeId,
+      session_id: connected.sessionId,
+      code: event.code ?? null,
+      reason: event.reason ?? event.error.message,
+    });
     resolveClosed(event);
   });
 
   connected.client.onMessage(async (message, client) => {
     if (message.type === MESSAGE_TYPE.PROXY_REQUEST) {
       activeRequests += 1;
+      log.info("control-client", "proxy-request", {
+        node_id: nodeId,
+        session_id: connected.sessionId,
+        method: message.method,
+        target_url: sanitizeUrl(message.target_url),
+      });
       try {
-        await client.send(await executeProxyCommand(message));
+        const response = await executeProxyCommand(message);
+        log.info("control-client", "proxy-response", {
+          node_id: nodeId,
+          session_id: connected.sessionId,
+          status: response.status,
+        });
+        await client.send(response);
       } catch (error) {
+        log.error("control-client", "proxy-failed", {
+          node_id: nodeId,
+          session_id: connected.sessionId,
+          message: error instanceof Error ? error.message : String(error),
+        });
         await client.send(createErrorMessage({
           reply_to: message.id,
           code: "proxy_failed",
@@ -89,11 +124,22 @@ export async function startControlClient(options: ControlClientOptions) {
     if (message.type === MESSAGE_TYPE.STREAM_OPEN) {
       if (message.target === "proxy-session") {
         activeStreams.add(message.stream_id);
+        log.info("control-client", "proxy-stream-open", {
+          node_id: nodeId,
+          session_id: connected.sessionId,
+          stream_id: message.stream_id,
+        });
         return;
       }
 
       const target = parseRawTunnelTarget(message.target);
       if (!target) {
+        log.warn("control-client", "stream-open-rejected", {
+          node_id: nodeId,
+          session_id: connected.sessionId,
+          stream_id: message.stream_id,
+          target: message.target ?? null,
+        });
         await client.send(createErrorMessage({
           code: "unsupported_stream_target",
           message: `Unsupported stream target: ${message.target ?? ""}`,
@@ -102,6 +148,13 @@ export async function startControlClient(options: ControlClientOptions) {
       }
 
       activeStreams.add(message.stream_id);
+      log.info("control-client", "raw-stream-open", {
+        node_id: nodeId,
+        session_id: connected.sessionId,
+        stream_id: message.stream_id,
+        target_host: target.host,
+        target_port: target.port,
+      });
       const socket = net.createConnection({ host: target.host, port: target.port });
       rawStreams.set(message.stream_id, socket);
 
@@ -118,6 +171,11 @@ export async function startControlClient(options: ControlClientOptions) {
       socket.on("close", () => {
         rawStreams.delete(message.stream_id);
         activeStreams.delete(message.stream_id);
+        log.info("control-client", "raw-stream-closed", {
+          node_id: nodeId,
+          session_id: connected.sessionId,
+          stream_id: message.stream_id,
+        });
         void client.send({
           type: MESSAGE_TYPE.STREAM_CLOSE,
           timestamp: nowSeconds(),
@@ -129,6 +187,12 @@ export async function startControlClient(options: ControlClientOptions) {
       socket.on("error", (error) => {
         rawStreams.delete(message.stream_id);
         activeStreams.delete(message.stream_id);
+        log.error("control-client", "raw-stream-error", {
+          node_id: nodeId,
+          session_id: connected.sessionId,
+          stream_id: message.stream_id,
+          message: error.message,
+        });
         void client.send(createErrorMessage({
           code: "raw_tunnel_failed",
           message: error.message,
@@ -179,6 +243,13 @@ export async function startControlClient(options: ControlClientOptions) {
     if (message.type === MESSAGE_TYPE.UPDATE_PREPARE) {
       try {
         const current = releaseManifest();
+        log.info("node-update", "prepare-received", {
+          node_id: nodeId,
+          session_id: connected.sessionId,
+          update_id: message.update_id,
+          current_version: current.version,
+          target_version: message.manifest.version,
+        });
         const status = compareManifests(current, message.manifest);
         const downloaded = status.update_required
           ? await downloadAndVerify(message.manifest)
@@ -189,6 +260,14 @@ export async function startControlClient(options: ControlClientOptions) {
           artifactPath: downloaded.path,
           sha256: downloaded.sha256,
         };
+        log.info("node-update", "prepare-ready", {
+          node_id: nodeId,
+          session_id: connected.sessionId,
+          update_id: message.update_id,
+          update_required: status.update_required,
+          artifact_path: downloaded.path,
+          sha256: downloaded.sha256,
+        });
         await client.send({
           type: MESSAGE_TYPE.UPDATE_READY,
           timestamp: nowSeconds(),
@@ -200,6 +279,12 @@ export async function startControlClient(options: ControlClientOptions) {
           target_version: message.manifest.version,
         });
       } catch (error) {
+        log.error("node-update", "prepare-failed", {
+          node_id: nodeId,
+          session_id: connected.sessionId,
+          update_id: message.update_id,
+          message: error instanceof Error ? error.message : String(error),
+        });
         await client.send({
           type: MESSAGE_TYPE.UPDATE_FAILED,
           timestamp: nowSeconds(),
@@ -214,6 +299,12 @@ export async function startControlClient(options: ControlClientOptions) {
 
     if (message.type === MESSAGE_TYPE.UPDATE_APPLY) {
       if (!preparedUpdate || preparedUpdate.updateId !== message.update_id) {
+        log.warn("node-update", "apply-rejected", {
+          node_id: nodeId,
+          session_id: connected.sessionId,
+          update_id: message.update_id,
+          reason: "update not prepared",
+        });
         await client.send({
           type: MESSAGE_TYPE.UPDATE_FAILED,
           timestamp: nowSeconds(),
@@ -231,13 +322,32 @@ export async function startControlClient(options: ControlClientOptions) {
       });
 
       const restartAfterMs = Math.max(0, message.restart_after_ms ?? 1_000);
+      log.info("node-update", "apply-scheduled", {
+        node_id: nodeId,
+        session_id: connected.sessionId,
+        update_id: message.update_id,
+        target_version: preparedUpdate.manifest.version,
+        restart_after_ms: restartAfterMs,
+      });
       setTimeout(() => {
         void (async () => {
           try {
             await runUpdateCommand(preparedUpdate!);
+            log.info("node-update", "apply-complete", {
+              node_id: nodeId,
+              session_id: connected.sessionId,
+              update_id: message.update_id,
+              target_version: preparedUpdate!.manifest.version,
+            });
             connected.client.close(1012, "node update apply requested");
             process.exit(75);
           } catch (error) {
+            log.error("node-update", "apply-failed", {
+              node_id: nodeId,
+              session_id: connected.sessionId,
+              update_id: message.update_id,
+              message: error instanceof Error ? error.message : String(error),
+            });
             await client.send({
               type: MESSAGE_TYPE.UPDATE_FAILED,
               timestamp: nowSeconds(),
@@ -257,7 +367,14 @@ export async function startControlClient(options: ControlClientOptions) {
       throw new Error("No node update command is available");
     }
 
-    console.error(`Applying node update ${update.manifest.version} with ${command}`);
+    log.info("node-update", "installer-start", {
+      node_id: nodeId,
+      session_id: connected.sessionId,
+      update_id: update.updateId,
+      target_version: update.manifest.version,
+      command,
+      artifact_path: update.artifactPath,
+    });
     const child = Bun.spawn(["sh", "-lc", command], {
       env: {
         ...process.env,
@@ -272,6 +389,12 @@ export async function startControlClient(options: ControlClientOptions) {
     if (code !== 0) {
       throw new Error(`Node update command exited with code ${code}`);
     }
+    log.info("node-update", "installer-complete", {
+      node_id: nodeId,
+      session_id: connected.sessionId,
+      update_id: update.updateId,
+      target_version: update.manifest.version,
+    });
   }
 
   function updateCommand(): string | null {
@@ -295,7 +418,11 @@ export async function startControlClient(options: ControlClientOptions) {
 
   const timer = setInterval(() => {
     void sendHeartbeat().catch((error) => {
-      console.error("Control heartbeat failed:", error);
+      log.error("control-client", "heartbeat-failed", {
+        node_id: nodeId,
+        session_id: connected.sessionId,
+        message: error instanceof Error ? error.message : String(error),
+      });
       if (!stopped) connected.client.close(1011, "heartbeat failed");
     });
   }, heartbeatIntervalMs);
@@ -307,9 +434,25 @@ export async function startControlClient(options: ControlClientOptions) {
     stop: () => {
       stopped = true;
       clearInterval(timer);
+      log.info("control-client", "stop-requested", {
+        node_id: nodeId,
+        session_id: connected.sessionId,
+      });
       connected.client.close(1000, "control stopped");
     },
   };
+}
+
+function sanitizeUrl(value: string): string {
+  try {
+    const url = new URL(value);
+    url.username = "";
+    url.password = "";
+    url.search = url.search ? "?..." : "";
+    return url.toString();
+  } catch {
+    return value.length > 120 ? `${value.slice(0, 117)}...` : value;
+  }
 }
 
 function parseRawTunnelTarget(value: string | undefined): { host: string; port: number } | null {
