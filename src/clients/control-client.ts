@@ -1,4 +1,5 @@
 import { loadOrCreateIdentity } from "../crypto/identity";
+import net from "node:net";
 import { releaseManifest } from "../node/manifest";
 import { loadConfig } from "../node/state";
 import { capabilitiesRecord } from "../runtime/capabilities";
@@ -34,6 +35,7 @@ export async function startControlClient(options: ControlClientOptions) {
   const heartbeatIntervalMs = options.heartbeatIntervalMs ?? 30_000;
   let activeRequests = 0;
   const activeStreams = new Set<string>();
+  const rawStreams = new Map<string, net.Socket>();
   let preparedUpdate: {
     updateId: string;
     manifest: ReleaseManifest;
@@ -82,17 +84,69 @@ export async function startControlClient(options: ControlClientOptions) {
     }
 
     if (message.type === MESSAGE_TYPE.STREAM_OPEN) {
-      if (message.target !== "proxy-session") {
+      if (message.target === "proxy-session") {
+        activeStreams.add(message.stream_id);
+        return;
+      }
+
+      const target = parseRawTunnelTarget(message.target);
+      if (!target) {
         await client.send(createErrorMessage({
           code: "unsupported_stream_target",
           message: `Unsupported stream target: ${message.target ?? ""}`,
         }));
+        return;
       }
+
       activeStreams.add(message.stream_id);
+      const socket = net.createConnection({ host: target.host, port: target.port });
+      rawStreams.set(message.stream_id, socket);
+
+      socket.on("data", (data) => {
+        void client.send({
+          type: MESSAGE_TYPE.STREAM_DATA,
+          timestamp: nowSeconds(),
+          stream_id: message.stream_id,
+          data: data.toString("base64"),
+          encoding: "base64",
+        }).catch(() => undefined);
+      });
+
+      socket.on("close", () => {
+        rawStreams.delete(message.stream_id);
+        activeStreams.delete(message.stream_id);
+        void client.send({
+          type: MESSAGE_TYPE.STREAM_CLOSE,
+          timestamp: nowSeconds(),
+          stream_id: message.stream_id,
+          reason: "target closed",
+        }).catch(() => undefined);
+      });
+
+      socket.on("error", (error) => {
+        rawStreams.delete(message.stream_id);
+        activeStreams.delete(message.stream_id);
+        void client.send(createErrorMessage({
+          code: "raw_tunnel_failed",
+          message: error.message,
+        })).catch(() => undefined);
+        void client.send({
+          type: MESSAGE_TYPE.STREAM_CLOSE,
+          timestamp: nowSeconds(),
+          stream_id: message.stream_id,
+          reason: error.message,
+        }).catch(() => undefined);
+      });
       return;
     }
 
     if (message.type === MESSAGE_TYPE.STREAM_DATA) {
+      const rawSocket = rawStreams.get(message.stream_id);
+      if (rawSocket) {
+        rawSocket.write(Buffer.from(message.data, "base64"));
+        return;
+      }
+
       activeRequests += 1;
       try {
         const output = await executeProxySessionMessage(Buffer.from(message.data, "base64"));
@@ -110,6 +164,11 @@ export async function startControlClient(options: ControlClientOptions) {
     }
 
     if (message.type === MESSAGE_TYPE.STREAM_CLOSE) {
+      const rawSocket = rawStreams.get(message.stream_id);
+      if (rawSocket) {
+        rawStreams.delete(message.stream_id);
+        rawSocket.destroy();
+      }
       activeStreams.delete(message.stream_id);
       return;
     }
@@ -206,4 +265,18 @@ export async function startControlClient(options: ControlClientOptions) {
       connected.client.close(1000, "control stopped");
     },
   };
+}
+
+function parseRawTunnelTarget(value: string | undefined): { host: string; port: number } | null {
+  if (!value) return null;
+  try {
+    const parsed = JSON.parse(value) as { kind?: string; host?: string; port?: number };
+    if (parsed.kind !== "raw-tunnel" || !parsed.host) return null;
+    if (typeof parsed.port !== "number" || !Number.isInteger(parsed.port) || parsed.port < 1 || parsed.port > 65535) {
+      return null;
+    }
+    return { host: parsed.host, port: parsed.port };
+  } catch {
+    return null;
+  }
 }
