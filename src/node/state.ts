@@ -11,6 +11,7 @@ export interface StatePaths {
   publicKeyPem: string;
   manifest: string;
   joinAuth: string;
+  setupProgress: string;
 }
 
 export function stateDir(): string {
@@ -27,7 +28,8 @@ export function paths(): StatePaths {
     privateKeyPem: path.join(keysDir, "node.key"),
     publicKeyPem: path.join(keysDir, "node.pub"),
     manifest: path.join(base, "release-manifest.json"),
-    joinAuth: path.join(base, "join-auth.json")
+    joinAuth: path.join(base, "join-auth.json"),
+    setupProgress: path.join(base, "setup-progress.json")
   };
 }
 
@@ -87,4 +89,35 @@ export async function saveJoinAuthorization(auth: JoinAuthorization): Promise<vo
 export async function loadJoinAuthorization(): Promise<JoinAuthorization | null> {
   const p = await ensureState();
   return readJson<JoinAuthorization | null>(p.joinAuth, null);
+}
+
+export interface SetupProgress {
+  serverUrl?: string;
+  installDir?: string;
+  installedVersion?: string;
+  publicIpv4?: string;
+  publicIpv6?: string | null;
+  region?: {
+    region: string;
+    city?: string;
+    country_code: string;
+  } | null;
+  evalPassedAt?: string;
+  contact?: string;
+  emailVerificationToken?: string;
+  emailVerificationExpiresAt?: number;
+  evmAddress?: string;
+  solanaAddress?: string;
+  icpAddress?: string;
+  port?: string;
+}
+
+export async function loadSetupProgress(): Promise<SetupProgress> {
+  const p = await ensureState();
+  return readJson<SetupProgress>(p.setupProgress, {});
+}
+
+export async function saveSetupProgress(progress: SetupProgress): Promise<void> {
+  const p = await ensureState();
+  await fs.writeFile(p.setupProgress, JSON.stringify(progress, null, 2), { encoding: "utf8", mode: 0o600 });
 }

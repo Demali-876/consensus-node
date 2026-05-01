@@ -13,6 +13,7 @@ export interface EvalClientOptions {
 }
 
 export async function startEvalClient(options: EvalClientOptions) {
+  console.log(`Opening encrypted eval tunnel: ${options.gatewayUrl}`);
   const connected = await connectEncryptedTunnel({
     url: options.gatewayUrl,
     mode: TUNNEL_MODE.EVAL,
@@ -20,6 +21,7 @@ export async function startEvalClient(options: EvalClientOptions) {
     releaseVersion: releaseManifest().version,
     requestTimeoutMs: options.requestTimeoutMs,
   });
+  console.log(`Encrypted handshake complete: session ${connected.sessionId}`);
 
   connected.client.onMessage(async (message, client) => {
     if (message.type === MESSAGE_TYPE.EVAL_REQUEST) {
@@ -35,6 +37,7 @@ export async function startEvalClient(options: EvalClientOptions) {
 }
 
 async function handleJoinReady(message: JoinReadyMessage): Promise<void> {
+  console.log(`Join authorization received: ${message.join_id}`);
   const identity = await loadOrCreateIdentity();
   const nonce = decodeBase64Url(message.nonce);
   const signature = signBytes(identity.privateKeyPem, nonce);
@@ -56,8 +59,10 @@ function decodeBase64Url(value: string): Buffer {
 }
 
 async function handleEvalRequest(message: EvalRequestMessage, client: TunnelClient): Promise<void> {
+  console.log(`Running eval action: ${message.action}`);
   try {
     const result = await runEvalAction(message.action, message.params ?? {});
+    console.log(`Completed eval action: ${message.action}`);
     await client.send({
       type: MESSAGE_TYPE.EVAL_RESPONSE,
       timestamp: nowSeconds(),
