@@ -109,7 +109,7 @@ async function main(): Promise<void> {
       if (existingConfig.domain) console.log(`Domain: ${existingConfig.domain}`);
       console.log(`Runtime: ${installDir}/current`);
       console.log(`State: ${stateDir()}`);
-      console.log("Next: start the control tunnel.");
+      console.log("Next: start the control tunnel with scripts/run-control.sh or install the launchd/systemd service.");
       return;
     }
 
@@ -130,7 +130,7 @@ async function main(): Promise<void> {
     console.log("\nSetup complete.");
     console.log(`Runtime: ${installDir}/current`);
     console.log(`State: ${stateDir()}`);
-    console.log("Next: install the launchd/systemd service, then start the control tunnel.");
+    console.log("Next: install the launchd/systemd service, or start scripts/run-control.sh for supervised updates.");
   } finally {
     rl.close();
   }

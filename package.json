@@ -1,6 +1,6 @@
 {
   "name": "@canister-software/consensus-node",
-  "version": "0.1.0-alpha.3",
+  "version": "0.1.0-alpha.4",
   "description": "Verifiable Consensus worker node runtime",
   "type": "module",
   "main": "src/instance.ts",

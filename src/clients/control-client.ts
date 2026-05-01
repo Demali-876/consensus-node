@@ -1,5 +1,8 @@
 import { loadOrCreateIdentity } from "../crypto/identity";
 import net from "node:net";
+import fs from "node:fs";
+import os from "node:os";
+import path from "node:path";
 import { releaseManifest } from "../node/manifest";
 import { loadConfig } from "../node/state";
 import { capabilitiesRecord } from "../runtime/capabilities";
@@ -229,24 +232,66 @@ export async function startControlClient(options: ControlClientOptions) {
 
       const restartAfterMs = Math.max(0, message.restart_after_ms ?? 1_000);
       setTimeout(() => {
-        connected.client.close(1012, "node update apply requested");
-        const command = process.env.CONSENSUS_NODE_UPDATE_COMMAND;
-        if (command) {
-          Bun.spawn(["sh", "-lc", command], {
-            env: {
-              ...process.env,
-              CONSENSUS_NODE_UPDATE_ID: preparedUpdate!.updateId,
-              CONSENSUS_NODE_ARTIFACT_PATH: preparedUpdate!.artifactPath,
-              CONSENSUS_NODE_TARGET_VERSION: preparedUpdate!.manifest.version,
-            },
-            stdout: "inherit",
-            stderr: "inherit",
-          });
-        }
-        process.exit(0);
+        void (async () => {
+          try {
+            await runUpdateCommand(preparedUpdate!);
+            connected.client.close(1012, "node update apply requested");
+            process.exit(75);
+          } catch (error) {
+            await client.send({
+              type: MESSAGE_TYPE.UPDATE_FAILED,
+              timestamp: nowSeconds(),
+              update_id: message.update_id,
+              code: "apply_failed",
+              message: error instanceof Error ? error.message : String(error),
+            }).catch(() => undefined);
+          }
+        })();
       }, restartAfterMs).unref();
     }
   });
+
+  async function runUpdateCommand(update: NonNullable<typeof preparedUpdate>): Promise<void> {
+    const command = updateCommand();
+    if (!command) {
+      throw new Error("No node update command is available");
+    }
+
+    console.error(`Applying node update ${update.manifest.version} with ${command}`);
+    const child = Bun.spawn(["sh", "-lc", command], {
+      env: {
+        ...process.env,
+        CONSENSUS_NODE_UPDATE_ID: update.updateId,
+        CONSENSUS_NODE_ARTIFACT_PATH: update.artifactPath,
+        CONSENSUS_NODE_TARGET_VERSION: update.manifest.version,
+      },
+      stdout: "inherit",
+      stderr: "inherit",
+    });
+    const code = await child.exited;
+    if (code !== 0) {
+      throw new Error(`Node update command exited with code ${code}`);
+    }
+  }
+
+  function updateCommand(): string | null {
+    const explicit = process.env.CONSENSUS_NODE_UPDATE_COMMAND?.trim();
+    if (explicit) return explicit;
+
+    const localScript = path.join(process.cwd(), "scripts", "install-release.sh");
+    if (fs.existsSync(localScript)) return shellQuote(localScript);
+
+    const installDir = process.env.CONSENSUS_NODE_INSTALL_DIR?.trim() ||
+      path.join(os.homedir(), ".consensus", "node-runtime");
+    const installedScript = path.join(installDir, "current", "scripts", "install-release.sh");
+    if (fs.existsSync(installedScript)) return shellQuote(installedScript);
+
+    return null;
+  }
+
+  function shellQuote(value: string): string {
+    return `'${value.replace(/'/g, `'\\''`)}'`;
+  }
 
   const timer = setInterval(() => {
     void sendHeartbeat().catch((error) => {

@@ -145,8 +145,10 @@ verifies the release artifact, then replies `update_ready`. The server drains th
 node from routing and sends `update_apply` only when the router sees the node as
 idle.
 
-On apply, the node acknowledges, closes its control tunnel, and exits. In
-production, run the node under a process manager. If
+On apply, the node acknowledges, runs the installer, closes its control tunnel,
+and exits with code `75`. In production, run the node through
+`scripts/run-control.sh` under a process manager. The wrapper restarts from the
+new `current` symlink whenever it sees exit code `75`. If
 `CONSENSUS_NODE_UPDATE_COMMAND` is set, the node runs it before exiting with:
 
 ```txt
@@ -155,8 +157,8 @@ CONSENSUS_NODE_ARTIFACT_PATH
 CONSENSUS_NODE_TARGET_VERSION
 ```
 
-That command should install the verified artifact and let the process manager
-restart the node.
+That command should install the verified artifact. If the command is not set,
+the runtime falls back to `scripts/install-release.sh` from the current release.
 
 The default installer contract is:
 
