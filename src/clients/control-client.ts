@@ -78,6 +78,9 @@ export async function startControlClient(options: ControlClientOptions) {
   });
   connected.client.onClose((event) => {
     clearInterval(timer);
+    for (const socket of rawStreams.values()) socket.destroy();
+    rawStreams.clear();
+    activeStreams.clear();
     log.warn("control-client", "connection-closed", {
       node_id: nodeId,
       session_id: connected.sessionId,
@@ -156,6 +159,7 @@ export async function startControlClient(options: ControlClientOptions) {
         target_port: target.port,
       });
       const socket = net.createConnection({ host: target.host, port: target.port });
+      socket.setTimeout(15_000, () => socket.destroy(new Error("raw tunnel connection timeout")));
       rawStreams.set(message.stream_id, socket);
 
       socket.on("data", (data) => {

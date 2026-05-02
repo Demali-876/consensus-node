@@ -22,6 +22,8 @@
     "test:eval-client": "bun src/tests/eval-client.test.ts",
     "test:control-client": "bun src/tests/control-client.test.ts",
     "test:register": "bun src/tests/register.test.ts",
+    "test:benchmarks": "bun src/tests/benchmarks.test.ts",
+    "test:streams": "bun src/tests/streams.test.ts",
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },
   "dependencies": {

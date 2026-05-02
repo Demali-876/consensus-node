@@ -240,7 +240,9 @@ export async function registerBenchmarkRoutes(app: FastifyInstance): Promise<voi
   }));
 }
 
-function integerParam(value: unknown, fallback: number, min: number, max: number): number {
+export function integerParam(value: unknown, fallback: number, min: number, max: number): number {
+  if (typeof value !== "number" && typeof value !== "string") return fallback;
+  if (typeof value === "string" && value.trim() === "") return fallback;
   const parsed = typeof value === "number" ? value : Number(value);
   if (!Number.isInteger(parsed)) return fallback;
   return Math.min(max, Math.max(min, parsed));
@@ -251,9 +253,9 @@ function average(values: number[]): number {
   return values.reduce((sum, value) => sum + value, 0) / values.length;
 }
 
-function percentile(sortedValues: number[], p: number): number {
+export function percentile(sortedValues: number[], p: number): number {
   if (sortedValues.length === 0) return 0;
-  const index = Math.min(sortedValues.length - 1, Math.ceil(sortedValues.length * p) - 1);
+  const index = Math.max(0, Math.min(sortedValues.length - 1, Math.ceil(sortedValues.length * p) - 1));
   return sortedValues[index] ?? 0;
 }
 
