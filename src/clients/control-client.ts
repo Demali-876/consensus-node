@@ -1,18 +1,18 @@
-import { loadOrCreateIdentity } from "../crypto/identity";
 import net from "node:net";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
-import { releaseManifest } from "../node/manifest";
 import { log } from "../log";
 import { loadConfig } from "../node/state";
+import type { ReleaseManifest } from "../types";
+import { releaseManifest } from "../node/manifest";
 import { capabilitiesRecord } from "../runtime/capabilities";
 import { executeProxyCommand } from "../runtime/proxy-command";
+import { loadOrCreateIdentity } from "../crypto/identity";
 import { executeProxySessionMessage } from "../runtime/proxy-session";
 import { connectEncryptedTunnel } from "../tunnel/connect";
 import { MESSAGE_TYPE, TUNNEL_MODE, createErrorMessage, nowSeconds } from "../tunnel/messages";
 import { compareManifests, downloadAndVerify } from "../update";
-import type { ReleaseManifest } from "../types";
 
 export interface ControlClientOptions {
   gatewayUrl: string;
@@ -78,12 +78,17 @@ export async function startControlClient(options: ControlClientOptions) {
   });
   connected.client.onClose((event) => {
     clearInterval(timer);
+    for (const socket of rawStreams.values()) {
+      socket.destroy();
+    }
     log.warn("control-client", "connection-closed", {
       node_id: nodeId,
       session_id: connected.sessionId,
       code: event.code ?? null,
       reason: event.reason ?? event.error.message,
     });
+    rawStreams.clear();
+    activeStreams.clear();
     resolveClosed(event);
   });
 

@@ -119,7 +119,9 @@ async function memoryPressureBenchmark(params: Record<string, unknown>) {
   };
 }
 
-function integerParam(value: unknown, fallback: number, min: number, max: number): number {
+export function integerParam(value: unknown, fallback: number, min: number, max: number): number {
+  if (typeof value !== "number" && typeof value !== "string") return fallback;
+  if (typeof value === "string" && value.trim() === "") return fallback;
   const parsed = typeof value === "number" ? value : Number(value);
   if (!Number.isInteger(parsed)) return fallback;
   return Math.min(max, Math.max(min, parsed));
