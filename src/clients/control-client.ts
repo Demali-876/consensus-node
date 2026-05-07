@@ -174,6 +174,7 @@ export async function startControlClient(options: ControlClientOptions) {
       });
 
       socket.on("close", () => {
+        if (!rawStreams.has(message.stream_id)) return;
         rawStreams.delete(message.stream_id);
         activeStreams.delete(message.stream_id);
         log.info("control-client", "raw-stream-closed", {
