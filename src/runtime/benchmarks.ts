@@ -31,10 +31,11 @@ export async function registerBenchmarkRoutes(app: FastifyInstance): Promise<voi
   app.post("/benchmark/cpu", async (request, reply) => {
     const body = request.body as { iterations?: number; data?: string };
     if (!body?.iterations || !body?.data) return reply.code(400).send({ error: "Missing iterations or data" });
-
+    
+    const dataBuffer = Buffer.from(body.data, "utf8");
     const start = performance.now();
     for (let i = 0; i < body.iterations; i++) {
-      crypto.createHash("sha256").update(body.data).digest("hex");
+      crypto.createHash("sha256").update(dataBuffer).digest("hex");
     }
     const durationMs = performance.now() - start;
 
