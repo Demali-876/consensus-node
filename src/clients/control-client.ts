@@ -293,7 +293,7 @@ export async function startControlClient(options: ControlClientOptions) {
         await client.send({
           type: MESSAGE_TYPE.UPDATE_FAILED,
           timestamp: nowSeconds(),
-          reply_to: message.id,
+          reply_to: message.id ?? message.update_id,
           update_id: message.update_id,
           code: "prepare_failed",
           message: error instanceof Error ? error.message : String(error),
@@ -313,6 +313,7 @@ export async function startControlClient(options: ControlClientOptions) {
         await client.send({
           type: MESSAGE_TYPE.UPDATE_FAILED,
           timestamp: nowSeconds(),
+          reply_to: message.id ?? message.update_id,
           update_id: message.update_id,
           code: "update_not_prepared",
           message: "No matching prepared update is available",

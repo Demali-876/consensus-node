@@ -24,6 +24,7 @@
     "test:register": "bun src/tests/register.test.ts",
     "test:benchmarks": "bun src/tests/benchmarks.test.ts",
     "test:streams": "bun src/tests/streams.test.ts",
+    "test:update-reply-to": "bun src/tests/update-reply-to.test.ts",
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },
   "dependencies": {
