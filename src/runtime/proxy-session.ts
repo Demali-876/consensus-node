@@ -39,15 +39,12 @@ export async function executeProxySessionMessage(data: Buffer): Promise<Buffer> 
       body_encoding: "utf8",
     } satisfies ProxyRequestMessage);
 
-    const body = response.body_encoding === "base64"
-      ? Buffer.from(response.body ?? "", "base64").toString("utf8")
-      : response.body ?? "";
-
     return jsonBuffer({
       id: request.id,
       status: response.status,
       headers: response.headers ?? {},
-      body,
+      body: response.body ?? "",
+      body_encoding: response.body_encoding,
       meta: { served_by: "node-control" },
     });
   } catch (error) {
