@@ -60,7 +60,7 @@ export async function registerBenchmarkRoutes(app: FastifyInstance): Promise<voi
 
     const start = performance.now();
     for (let i = 0; i < iterations; i++) {
-      nonce.writeUInt32BE(i, 8);
+      nonce.writeBigUInt64BE(BigInt(i), 4);
       const sealed = Buffer.from(chacha20poly1305(key, nonce, aad).encrypt(payload));
       const opened = Buffer.from(chacha20poly1305(key, nonce, aad).decrypt(sealed));
       if (opened.length !== payload.length || opened[0] !== payload[0]) {

@@ -230,6 +230,17 @@ export async function startControlClient(options: ControlClientOptions) {
           data: output.toString("base64"),
           encoding: "base64",
         });
+       } catch (error) {
+        log.error("control-client", "stream-data-failed", {
+          node_id: nodeId,
+          session_id: connected.sessionId,
+          stream_id: message.stream_id,
+          message: error instanceof Error ? error.message : String(error),
+        });
+        void client.send(createErrorMessage({
+          code: "stream_data_failed",
+          message: error instanceof Error ? error.message : String(error),
+        })).catch(() => undefined);
       } finally {
         activeRequests = Math.max(0, activeRequests - 1);
       }
