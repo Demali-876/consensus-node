@@ -77,6 +77,17 @@ export function decodeFrame(raw: Buffer): FrameParts {
   };
 }
 
+/**
+ * Reads the sequence number from a raw frame buffer without decrypting.
+ * Use this to reject replayed/out-of-order frames before paying decryption cost.
+ */
+export function peekFrameSequence(raw: Buffer): bigint {
+  if (raw.length < HEADER_SIZE + TAG_SIZE) {
+    throw new RangeError(`Frame too short: ${raw.length} bytes`);
+  }
+  return raw.readBigUInt64BE(2);
+}
+
 export function frameAad(parts: Pick<FrameParts, "version" | "type" | "sequence"> & {
   ciphertextLength: number;
 }): Buffer {
