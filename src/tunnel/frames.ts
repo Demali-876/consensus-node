@@ -97,6 +97,12 @@ export function frameAad(parts: Pick<FrameParts, "version" | "type" | "sequence"
   aad.writeUInt32BE(parts.ciphertextLength, 10);
   return aad;
 }
+export function peekFrameSequence(raw: Buffer): bigint {
+  if (raw.length < HEADER_SIZE + TAG_SIZE) {
+    throw new RangeError(`Frame too short: ${raw.length} bytes`);
+  }
+  return raw.readBigUInt64BE(2);
+}
 
 function validateParts(parts: FrameParts): void {
   if (parts.version !== FRAME_VERSION) {
