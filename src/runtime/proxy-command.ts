@@ -1,7 +1,33 @@
 import type { ProxyRequestMessage, ProxyResponseMessage } from "../tunnel/messages";
 import { MESSAGE_TYPE, nowSeconds } from "../tunnel/messages";
 
+export function isBlockedProxyUrl(urlStr: string): boolean {
+  let raw: string;
+  try {
+    raw = new URL(urlStr).hostname.toLowerCase();
+  } catch {
+    return true;
+  }
+  // Strip IPv6 brackets so all checks work on the bare address.
+  const host = raw.startsWith("[") && raw.endsWith("]") ? raw.slice(1, -1) : raw;
+  return (
+    host === "localhost" ||
+    /^127\./.test(host) ||
+    /^10\./.test(host) ||
+    /^172\.(1[6-9]|2\d|30|31)\./.test(host) ||
+    /^192\.168\./.test(host) ||
+    /^169\.254\./.test(host) ||
+    host === "::1" ||
+    /^fe80:/i.test(host) ||
+    /^fc[0-9a-f]{2}:/i.test(host) ||
+    /^fd[0-9a-f]{2}:/i.test(host)
+  );
+}
+
 export async function executeProxyCommand(message: ProxyRequestMessage): Promise<ProxyResponseMessage> {
+  if (isBlockedProxyUrl(message.target_url)) {
+    throw new Error(`Proxy request blocked: target URL resolves to a private or reserved address`);
+  }
   const method = (message.method || "GET").toUpperCase();
   const start = performance.now();
   const body = decodeBody(message.body, message.body_encoding);

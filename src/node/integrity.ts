@@ -6,13 +6,14 @@ import type { IntegrityPayload } from "../types";
 
 export async function integrityPayload(): Promise<IntegrityPayload> {
   const identity = await loadOrCreateIdentity();
+  const manifest = releaseManifest();
   const unsigned = {
     product: "consensus-node" as const,
-    version: releaseManifest().version,
+    version: manifest.version,
     runtime: "bun" as const,
-    platform: releaseManifest().platform,
+    platform: manifest.platform,
     node_public_key_pem: identity.publicKeyPem,
-    manifest: releaseManifest(),
+    manifest,
     timestamp: Math.floor(Date.now() / 1000),
     nonce: crypto.randomBytes(16).toString("hex")
   };

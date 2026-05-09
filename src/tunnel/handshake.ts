@@ -13,6 +13,9 @@ import { TUNNEL_MODE, type TunnelMode, nowSeconds } from "./messages";
 export const HANDSHAKE_PROTOCOL = "consensus-node-tunnel";
 export const HANDSHAKE_VERSION = 1;
 
+const HANDSHAKE_MAX_AGE_SECONDS = 300;  // reject messages older than 5 minutes
+const HANDSHAKE_MAX_FUTURE_SECONDS = 60; // tolerate up to 1 minute of clock skew
+
 export const HANDSHAKE_TYPE = {
   INIT:   "handshake_init",
   ACCEPT: "handshake_accept",
@@ -276,6 +279,10 @@ function assertHandshakeBase(value: unknown, type: string): Record<string, unkno
   if (message.version !== HANDSHAKE_VERSION) throw new TypeError(`Unsupported handshake version: ${String(message.version)}`);
   if (typeof message.timestamp !== "number" || !Number.isFinite(message.timestamp)) {
     throw new TypeError("Handshake timestamp must be a finite number");
+  }
+  const now = nowSeconds();
+  if (message.timestamp < now - HANDSHAKE_MAX_AGE_SECONDS || message.timestamp > now + HANDSHAKE_MAX_FUTURE_SECONDS) {
+    throw new TypeError("Handshake timestamp is outside the acceptable window");
   }
   return message;
 }

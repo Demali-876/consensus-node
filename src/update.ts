@@ -77,6 +77,9 @@ export async function downloadAndVerify(manifest: ReleaseManifest): Promise<{ pa
   if (!manifest.download_url) {
     throw new Error("Required manifest does not include download_url");
   }
+  if (!manifest.tarball_sha256) {
+    throw new Error("Required manifest does not include tarball_sha256: refusing to install without integrity verification");
+  }
 
   const response = await fetch(manifest.download_url, {
     signal: AbortSignal.timeout(120_000),
@@ -87,7 +90,7 @@ export async function downloadAndVerify(manifest: ReleaseManifest): Promise<{ pa
 
   const bytes = Buffer.from(await response.arrayBuffer());
   const sha256 = crypto.createHash("sha256").update(bytes).digest("hex");
-  if (manifest.tarball_sha256 && sha256 !== stripShaPrefix(manifest.tarball_sha256)) {
+  if (sha256 !== stripShaPrefix(manifest.tarball_sha256)) {
     throw new Error(`Artifact SHA-256 mismatch: expected ${manifest.tarball_sha256}, got ${sha256}`);
   }
 
