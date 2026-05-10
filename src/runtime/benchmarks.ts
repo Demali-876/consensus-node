@@ -31,19 +31,29 @@ export async function registerBenchmarkRoutes(app: FastifyInstance): Promise<voi
   app.post("/benchmark/cpu", async (request, reply) => {
     const body = request.body as { iterations?: number; data?: string };
     if (!body?.iterations || !body?.data) return reply.code(400).send({ error: "Missing iterations or data" });
-    
-    const dataBuffer = Buffer.from(body.data, "utf8");
+
+    // Cap iterations identically to /benchmark/crypto so no single request can
+    // monopolise the CPU.  Before this fix, body.iterations was used raw.
+    const iterations = integerParam(body.iterations, 10_000, 1, 25_000);
+
+    // Limit the hash payload so large data * max iterations cannot stack into a
+    // multi-second block.  1 KB keeps each hash sub-microsecond.
+    const MAX_DATA_BYTES = 1024;
+    const dataBuffer = Buffer.from(body.data.slice(0, MAX_DATA_BYTES), "utf8");
+    if (dataBuffer.length === 0) return reply.code(400).send({ error: "Missing data" });
+
     const start = performance.now();
-    for (let i = 0; i < body.iterations; i++) {
+    for (let i = 0; i < iterations; i++) {
       crypto.createHash("sha256").update(dataBuffer).digest("hex");
     }
     const durationMs = performance.now() - start;
 
     return {
       success: true,
-      iterations: body.iterations,
+      iterations,
+      data_bytes: dataBuffer.length,
       duration_ms: Math.round(durationMs),
-      hashes_per_second: Math.round((body.iterations / Math.max(durationMs, 1)) * 1000)
+      hashes_per_second: Math.round((iterations / Math.max(durationMs, 1)) * 1000)
     };
   });
 

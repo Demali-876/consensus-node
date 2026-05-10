@@ -13,6 +13,10 @@ import { TUNNEL_MODE, type TunnelMode, nowSeconds } from "./messages";
 export const HANDSHAKE_PROTOCOL = "consensus-node-tunnel";
 export const HANDSHAKE_VERSION = 1;
 
+// Maximum seconds a handshake timestamp may differ from the receiver's clock.
+// Keeps stale or future-dated messages from passing validation.
+export const MAX_CLOCK_DRIFT_SECONDS = 300;
+
 export const HANDSHAKE_TYPE = {
   INIT:   "handshake_init",
   ACCEPT: "handshake_accept",
@@ -120,6 +124,13 @@ export async function acceptClientHandshake(input: {
   init: HandshakeInitMessage;
   serverSigningKeyPem?: string;
 }): Promise<ServerHandshake> {
+  const ageSeconds = Math.abs(nowSeconds() - input.init.timestamp);
+  if (ageSeconds > MAX_CLOCK_DRIFT_SECONDS) {
+    throw new Error(
+      `Handshake timestamp is too old or too far in the future (${ageSeconds}s drift, max ${MAX_CLOCK_DRIFT_SECONDS}s)`,
+    );
+  }
+
   if (!verifyClientHandshake(input.init)) {
     throw new Error("Client handshake signature verification failed");
   }

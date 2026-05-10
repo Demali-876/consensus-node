@@ -26,6 +26,11 @@ const TAG_SIZE = 16;
 const MAX_U64 = (1n << 64n) - 1n;
 const VALID_TYPES = new Set<number>(Object.values(FRAME_TYPE));
 
+// Hard ceiling on the ciphertext portion of a single frame.  Without this,
+// a crafted header could claim up to 4 GB (uint32 max) before the
+// raw.length mismatch check fires.
+export const MAX_FRAME_PAYLOAD = 16 * 1024 * 1024; // 16 MB
+
 export function encodeFrame(parts: FrameParts): Buffer {
   validateParts(parts);
 
@@ -57,6 +62,11 @@ export function decodeFrame(raw: Buffer): FrameParts {
   const sequence = raw.readBigUInt64BE(2);
   const nonce = raw.subarray(10, 22);
   const ciphertextLength = raw.readUInt32BE(22);
+  if (ciphertextLength > MAX_FRAME_PAYLOAD) {
+    throw new RangeError(
+      `Frame payload too large: ${ciphertextLength} bytes (max ${MAX_FRAME_PAYLOAD})`,
+    );
+  }
   const expectedLength = HEADER_SIZE + ciphertextLength + TAG_SIZE;
   if (raw.length !== expectedLength) {
     throw new RangeError(`Invalid frame length: expected ${expectedLength}, got ${raw.length}`);
