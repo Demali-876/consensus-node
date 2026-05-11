@@ -19,6 +19,8 @@ export const HANDSHAKE_TYPE = {
   REJECT: "handshake_reject",
 } as const;
 
+const MAX_HANDSHAKE_AGE_SECONDS = 60;
+
 export interface HandshakeInitMessage {
   type: typeof HANDSHAKE_TYPE.INIT;
   protocol: typeof HANDSHAKE_PROTOCOL;
@@ -120,6 +122,10 @@ export async function acceptClientHandshake(input: {
   init: HandshakeInitMessage;
   serverSigningKeyPem?: string;
 }): Promise<ServerHandshake> {
+  const age = Math.abs(nowSeconds() - input.init.timestamp);
+  if (age > MAX_HANDSHAKE_AGE_SECONDS) {
+    throw new Error(`Handshake timestamp is stale: ${age}s old (max ${MAX_HANDSHAKE_AGE_SECONDS}s)`);
+  }
   if (!verifyClientHandshake(input.init)) {
     throw new Error("Client handshake signature verification failed");
   }

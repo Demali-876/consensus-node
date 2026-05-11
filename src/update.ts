@@ -87,7 +87,10 @@ export async function downloadAndVerify(manifest: ReleaseManifest): Promise<{ pa
 
   const bytes = Buffer.from(await response.arrayBuffer());
   const sha256 = crypto.createHash("sha256").update(bytes).digest("hex");
-  if (manifest.tarball_sha256 && sha256 !== stripShaPrefix(manifest.tarball_sha256)) {
+  if (!manifest.tarball_sha256) {
+    throw new Error("Artifact integrity cannot be verified: manifest is missing tarball_sha256");
+  }
+  if (sha256 !== stripShaPrefix(manifest.tarball_sha256)) {
     throw new Error(`Artifact SHA-256 mismatch: expected ${manifest.tarball_sha256}, got ${sha256}`);
   }
 

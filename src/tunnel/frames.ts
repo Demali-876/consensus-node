@@ -24,6 +24,7 @@ const HEADER_SIZE = 26;
 const NONCE_SIZE = 12;
 const TAG_SIZE = 16;
 const MAX_U64 = (1n << 64n) - 1n;
+const MAX_CIPHERTEXT_BYTES = 1 * 1024 * 1024; // 1 MB per frame
 const VALID_TYPES = new Set<number>(Object.values(FRAME_TYPE));
 
 export function encodeFrame(parts: FrameParts): Buffer {
@@ -57,6 +58,9 @@ export function decodeFrame(raw: Buffer): FrameParts {
   const sequence = raw.readBigUInt64BE(2);
   const nonce = raw.subarray(10, 22);
   const ciphertextLength = raw.readUInt32BE(22);
+  if (ciphertextLength > MAX_CIPHERTEXT_BYTES) {
+    throw new RangeError(`Frame ciphertext too large: ${ciphertextLength} bytes (max ${MAX_CIPHERTEXT_BYTES})`);
+  }
   const expectedLength = HEADER_SIZE + ciphertextLength + TAG_SIZE;
   if (raw.length !== expectedLength) {
     throw new RangeError(`Invalid frame length: expected ${expectedLength}, got ${raw.length}`);

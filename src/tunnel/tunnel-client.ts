@@ -129,7 +129,12 @@ export class TunnelClient {
     this.lastReceiveSequence = frame.sequence;
 
     if (frame.type === FRAME_TYPE.PING) {
-      await this.send(pongMessage(), FRAME_TYPE.PONG);
+      let pingId: string | undefined;
+      try {
+        const pingPayload = JSON.parse(plaintext.toString("utf8")) as { id?: unknown };
+        if (typeof pingPayload.id === "string") pingId = pingPayload.id;
+      } catch { /* non-JSON ping payload — reply without reply_to */ }
+      await this.send(pongMessage(pingId), FRAME_TYPE.PONG);
       return;
     }
 
@@ -194,10 +199,11 @@ export class TunnelClient {
   }
 }
 
-function pongMessage(): PongMessage {
+function pongMessage(replyTo?: string): PongMessage {
   return {
     type: MESSAGE_TYPE.PONG,
     timestamp: nowSeconds(),
+    ...(replyTo !== undefined && { reply_to: replyTo }),
   };
 }
 
