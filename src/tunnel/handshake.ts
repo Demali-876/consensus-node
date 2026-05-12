@@ -116,10 +116,21 @@ export function verifyClientHandshake(message: HandshakeInitMessage): boolean {
   );
 }
 
+const HANDSHAKE_MAX_AGE_SECONDS = 300;   // 5 minutes
+const HANDSHAKE_MAX_FUTURE_SECONDS = 60; // 1 minute
+
 export async function acceptClientHandshake(input: {
   init: HandshakeInitMessage;
   serverSigningKeyPem?: string;
 }): Promise<ServerHandshake> {
+  const now = nowSeconds();
+  if (input.init.timestamp < now - HANDSHAKE_MAX_AGE_SECONDS) {
+    throw new Error("Client handshake timestamp is too old");
+  }
+  if (input.init.timestamp > now + HANDSHAKE_MAX_FUTURE_SECONDS) {
+    throw new Error("Client handshake timestamp is in the future");
+  }
+
   if (!verifyClientHandshake(input.init)) {
     throw new Error("Client handshake signature verification failed");
   }
