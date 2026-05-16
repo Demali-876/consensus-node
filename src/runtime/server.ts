@@ -4,7 +4,7 @@ import { loadConfig } from "../node/state";
 import { releaseManifest } from "../node/manifest";
 import { integrityPayload } from "../node/integrity";
 import { capabilitiesRecord } from "./capabilities";
-import { registerBenchmarkRoutes } from "./benchmarks";
+import { registerBenchmarkRoutes } from "./benchmarks/routes";
 import { registerProxyRoutes } from "./proxy-worker";
 
 export async function buildServer() {
