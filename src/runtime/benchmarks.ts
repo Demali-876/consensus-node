@@ -3,6 +3,9 @@ import crypto from "node:crypto";
 import type { FastifyInstance } from "fastify";
 import { chacha20poly1305 } from "@noble/ciphers/chacha.js";
 
+const MAX_CPU_ITERATIONS = 200_000;
+const MAX_CPU_DATA_BYTES = 4_096;
+
 const ALLOWED_BENCHMARK_TARGETS = new Set([
   "https://httpbin.org/json",
   "https://api.github.com/zen",
@@ -31,19 +34,23 @@ export async function registerBenchmarkRoutes(app: FastifyInstance): Promise<voi
   app.post("/benchmark/cpu", async (request, reply) => {
     const body = request.body as { iterations?: number; data?: string };
     if (!body?.iterations || !body?.data) return reply.code(400).send({ error: "Missing iterations or data" });
-    
+    if (typeof body.data !== "string" || body.data.length > MAX_CPU_DATA_BYTES) {
+      return reply.code(400).send({ error: `data must not exceed ${MAX_CPU_DATA_BYTES} characters` });
+    }
+
+    const iterations = integerParam(body.iterations, 1_000, 1, MAX_CPU_ITERATIONS);
     const dataBuffer = Buffer.from(body.data, "utf8");
     const start = performance.now();
-    for (let i = 0; i < body.iterations; i++) {
+    for (let i = 0; i < iterations; i++) {
       crypto.createHash("sha256").update(dataBuffer).digest("hex");
     }
     const durationMs = performance.now() - start;
 
     return {
       success: true,
-      iterations: body.iterations,
+      iterations,
       duration_ms: Math.round(durationMs),
-      hashes_per_second: Math.round((body.iterations / Math.max(durationMs, 1)) * 1000)
+      hashes_per_second: Math.round((iterations / Math.max(durationMs, 1)) * 1000)
     };
   });
 

@@ -277,6 +277,10 @@ function assertHandshakeBase(value: unknown, type: string): Record<string, unkno
   if (typeof message.timestamp !== "number" || !Number.isFinite(message.timestamp)) {
     throw new TypeError("Handshake timestamp must be a finite number");
   }
+  const MAX_HANDSHAKE_SKEW_SECONDS = 300;
+  if (Math.abs(nowSeconds() - (message.timestamp as number)) > MAX_HANDSHAKE_SKEW_SECONDS) {
+    throw new TypeError(`Handshake timestamp is outside the acceptable ±${MAX_HANDSHAKE_SKEW_SECONDS}s window`);
+  }
   return message;
 }
 

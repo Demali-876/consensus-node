@@ -220,6 +220,20 @@ export async function startControlClient(options: ControlClientOptions) {
         return;
       }
 
+      if (!activeStreams.has(message.stream_id)) {
+        log.warn("control-client", "stream-data-rejected", {
+          node_id: nodeId,
+          session_id: connected.sessionId,
+          stream_id: message.stream_id,
+          reason: "stream not open",
+        });
+        await client.send(createErrorMessage({
+          code: "stream_not_open",
+          message: `No open stream with id: ${message.stream_id}`,
+        }));
+        return;
+      }
+
       activeRequests += 1;
       try {
         const output = await executeProxySessionMessage(Buffer.from(message.data, "base64"));
