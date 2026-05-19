@@ -18,8 +18,10 @@ while true; do
   fi
 
   cd "${current}"
+  set +e
   bun run control
   code=$?
+  set -e
 
   if [[ "${code}" == "75" ]]; then
     echo "Consensus node updated; restarting from ${install_dir}/current" >&2

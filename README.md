@@ -146,9 +146,9 @@ node from routing and sends `update_apply` only when the router sees the node as
 idle.
 
 On apply, the node acknowledges, runs the installer, closes its control tunnel,
-and exits with code `75`. In production, run the node through
-`scripts/run-control.sh` under a process manager. The wrapper restarts from the
-new `current` symlink whenever it sees exit code `75`. If
+and exits with code `75`. In production, run the node through PM2 with
+`ecosystem.config.cjs`; PM2 supervises `scripts/run-control.sh`, and the wrapper
+restarts from the new `current` symlink whenever it sees exit code `75`. If
 `CONSENSUS_NODE_UPDATE_COMMAND` is set, the node runs it before exiting with:
 
 ```txt
@@ -172,6 +172,23 @@ export CONSENSUS_NODE_UPDATE_COMMAND="$CONSENSUS_NODE_INSTALL_DIR/current/script
 the lockfile, and atomically moves the `current` symlink. `scripts/run-control.sh`
 always starts `bun run control` from that `current` release.
 
+Recommended PM2 start:
+
+```bash
+CONSENSUS_NODE_INSTALL_DIR="$HOME/.consensus/node-runtime" \
+CONSENSUS_STATE_DIR="$HOME/.consensus/node" \
+CONSENSUS_SERVER_URL=https://consensus.canister.software \
+"$HOME/.consensus/node-runtime/current/scripts/start-pm2.sh"
+```
+
+For reboot persistence, run `pm2 startup`, follow the command it prints, then run
+`pm2 save`.
+
+The installer prunes old release directories after each successful install. It
+keeps the newest 3 releases by default; set `CONSENSUS_NODE_RELEASE_RETENTION=1`
+to keep only the active release, except for the release currently finishing an
+update process.
+
 For the first install, download a release tarball and run:
 
 ```bash
@@ -180,7 +197,5 @@ CONSENSUS_NODE_TARGET_VERSION=0.1.0-alpha.0 \
 scripts/install-release.sh
 ```
 
-Then run the node under a process manager using the templates in `launchd/` or
-`systemd/`. On macOS, copy `launchd/com.consensus.node.plist`, replace the
-`${HOME}` placeholders with the absolute home path, then load it with
-`launchctl`.
+`scripts/ensure-pm2.sh` installs PM2 with npm when it is missing. The older
+`launchd/` and `systemd/` templates are still available if you do not want PM2.

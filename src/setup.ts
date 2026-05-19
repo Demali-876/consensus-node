@@ -8,6 +8,7 @@ import { loadConfig, loadJoinAuthorization, loadSetupProgress, saveSetupProgress
 
 const DEFAULT_SERVER_URL = "https://consensus.canister.software";
 const DEFAULT_INSTALL_DIR = path.join(process.env.HOME ?? ".", ".consensus", "node-runtime");
+const DEFAULT_PM2_NAME = "consensus-node-control";
 
 async function main(): Promise<void> {
   const rl = readline.createInterface({ input, output });
@@ -21,6 +22,7 @@ async function main(): Promise<void> {
     progress = await remember(progress, { serverUrl, installDir });
 
     await assertBunAvailable();
+    await ensurePm2Available(rl);
     console.log("\nFetching approved release manifest from Consensus server...");
     const manifest = await fetchRequiredManifest(serverUrl);
     console.log("\nApproved release:");
@@ -109,7 +111,7 @@ async function main(): Promise<void> {
       if (existingConfig.domain) console.log(`Domain: ${existingConfig.domain}`);
       console.log(`Runtime: ${installDir}/current`);
       console.log(`State: ${stateDir()}`);
-      console.log("Next: start the control tunnel with scripts/run-control.sh or install the launchd/systemd service.");
+      await offerStartPm2(rl, installDir, serverUrl);
       return;
     }
 
@@ -130,7 +132,7 @@ async function main(): Promise<void> {
     console.log("\nSetup complete.");
     console.log(`Runtime: ${installDir}/current`);
     console.log(`State: ${stateDir()}`);
-    console.log("Next: install the launchd/systemd service, or start scripts/run-control.sh for supervised updates.");
+    await offerStartPm2(rl, installDir, serverUrl);
   } finally {
     rl.close();
   }
@@ -204,6 +206,51 @@ async function assertBunAvailable(): Promise<void> {
   await run("bun", ["--version"], {});
 }
 
+async function ensurePm2Available(rl: readline.Interface): Promise<void> {
+  if (await commandSucceeds("pm2", ["--version"])) return;
+
+  console.log("\nPM2 is required for the recommended node process manager.");
+  if (!await confirm(rl, "Install PM2 globally with npm?", false)) {
+    throw new Error("PM2 is required. Install it with `npm install -g pm2`, then rerun setup.");
+  }
+  if (!await commandSucceeds("npm", ["--version"])) {
+    throw new Error("npm is required to install PM2 automatically. Install Node.js/npm, then run `npm install -g pm2`.");
+  }
+
+  await run("npm", ["install", "-g", "pm2"], {});
+  await run("pm2", ["--version"], {});
+}
+
+async function offerStartPm2(rl: readline.Interface, installDir: string, serverUrl: string): Promise<void> {
+  const appName = process.env.CONSENSUS_PM2_NAME?.trim() || DEFAULT_PM2_NAME;
+  const configPath = path.join(installDir, "current", "ecosystem.config.cjs");
+  if (!await pathExists(configPath)) {
+    console.log(`PM2 config not found at ${configPath}. Start PM2 after installing a release that includes it.`);
+    return;
+  }
+
+  if (!await confirm(rl, "Start the PM2 supervised control tunnel now?", true)) {
+    console.log(`Start later with: ${path.join(installDir, "current", "scripts", "start-pm2.sh")}`);
+    return;
+  }
+
+  const nodeStateDir = stateDir();
+  await fs.mkdir(nodeStateDir, { recursive: true });
+  await run("pm2", ["startOrReload", configPath, "--only", appName, "--update-env"], {
+    CONSENSUS_SERVER_URL: serverUrl,
+    CONSENSUS_STATE_DIR: nodeStateDir,
+    CONSENSUS_NODE_INSTALL_DIR: installDir,
+    CONSENSUS_NODE_RELEASE_RETENTION: process.env.CONSENSUS_NODE_RELEASE_RETENTION?.trim() || "3",
+    CONSENSUS_PM2_NAME: appName,
+    CONSENSUS_NODE_UPDATE_COMMAND: path.join(installDir, "current", "scripts", "install-release.sh"),
+  });
+  await run("pm2", ["save"], {});
+
+  console.log(`PM2 is managing ${appName}.`);
+  console.log(`Logs: pm2 logs ${appName}`);
+  console.log("For reboot persistence, run `pm2 startup`, follow its printed command, then run `pm2 save`.");
+}
+
 async function pathExists(target: string): Promise<boolean> {
   try {
     await fs.access(target);
@@ -231,6 +278,16 @@ async function run(command: string, args: string[], env: Record<string, string>,
     });
     child.on("exit", (code) => code === 0 ? resolve() : reject(new Error(`${command} exited with code ${code}`)));
     child.on("error", reject);
+  });
+}
+
+async function commandSucceeds(command: string, args: string[]): Promise<boolean> {
+  return await new Promise<boolean>((resolve) => {
+    const child = spawn(command, args, {
+      stdio: "ignore",
+    });
+    child.on("exit", (code) => resolve(code === 0));
+    child.on("error", () => resolve(false));
   });
 }
 
