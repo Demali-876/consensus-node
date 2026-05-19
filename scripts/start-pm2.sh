@@ -13,6 +13,28 @@ release_retention="${CONSENSUS_NODE_RELEASE_RETENTION:-3}"
 
 "${script_dir}/ensure-pm2.sh"
 
+for brew_path in /opt/homebrew/bin/brew /usr/local/bin/brew; do
+  if [[ -x "${brew_path}" ]]; then
+    eval "$("${brew_path}" shellenv)"
+    break
+  fi
+done
+
+pm2_bin="$(command -v pm2 || true)"
+if [[ -z "${pm2_bin}" ]]; then
+  for candidate in /opt/homebrew/bin/pm2 /usr/local/bin/pm2; do
+    if [[ -x "${candidate}" ]]; then
+      pm2_bin="${candidate}"
+      break
+    fi
+  done
+fi
+
+if [[ -z "${pm2_bin}" ]]; then
+  echo "PM2 was installed, but pm2 is not available on PATH or in standard Homebrew locations." >&2
+  exit 69
+fi
+
 if [[ ! -d "${install_dir}/current" ]]; then
   echo "No installed release at ${install_dir}/current" >&2
   exit 70
@@ -32,8 +54,8 @@ export CONSENSUS_PM2_NAME="${pm2_name}"
 export CONSENSUS_NODE_RELEASE_RETENTION="${release_retention}"
 export CONSENSUS_NODE_UPDATE_COMMAND="${CONSENSUS_NODE_UPDATE_COMMAND:-"${install_dir}/current/scripts/install-release.sh"}"
 
-pm2 startOrReload "${config}" --only "${pm2_name}" --update-env
-pm2 save
+"${pm2_bin}" startOrReload "${config}" --only "${pm2_name}" --update-env
+"${pm2_bin}" save
 
 echo "PM2 is managing ${pm2_name}."
 echo "Logs: pm2 logs ${pm2_name}"

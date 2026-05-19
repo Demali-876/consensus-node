@@ -207,18 +207,17 @@ async function assertBunAvailable(): Promise<void> {
 }
 
 async function ensurePm2Available(rl: readline.Interface): Promise<void> {
-  if (await commandSucceeds("pm2", ["--version"])) return;
+  if (await resolveExecutable("pm2")) return;
 
   console.log("\nPM2 is required for the recommended node process manager.");
-  if (!await confirm(rl, "Install PM2 globally with npm?", false)) {
-    throw new Error("PM2 is required. Install it with `npm install -g pm2`, then rerun setup.");
-  }
-  if (!await commandSucceeds("npm", ["--version"])) {
-    throw new Error("npm is required to install PM2 automatically. Install Node.js/npm, then run `npm install -g pm2`.");
+  if (!await confirm(rl, "Install PM2 and any missing macOS dependencies now?", false)) {
+    throw new Error("PM2 is required. Run `scripts/ensure-pm2.sh`, then rerun setup.");
   }
 
-  await run("npm", ["install", "-g", "pm2"], {});
-  await run("pm2", ["--version"], {});
+  await runScript("scripts/ensure-pm2.sh", [], {});
+  const pm2 = await resolveExecutable("pm2", ["/opt/homebrew/bin/pm2", "/usr/local/bin/pm2"]);
+  if (!pm2) throw new Error("PM2 installed, but pm2 was not found on PATH or in standard Homebrew locations.");
+  await run(pm2, ["--version"], {});
 }
 
 async function offerStartPm2(rl: readline.Interface, installDir: string, serverUrl: string): Promise<void> {
@@ -236,7 +235,9 @@ async function offerStartPm2(rl: readline.Interface, installDir: string, serverU
 
   const nodeStateDir = stateDir();
   await fs.mkdir(nodeStateDir, { recursive: true });
-  await run("pm2", ["startOrReload", configPath, "--only", appName, "--update-env"], {
+  const pm2 = await resolveExecutable("pm2", ["/opt/homebrew/bin/pm2", "/usr/local/bin/pm2"]);
+  if (!pm2) throw new Error("PM2 is not available. Run `scripts/ensure-pm2.sh`, then rerun setup.");
+  await run(pm2, ["startOrReload", configPath, "--only", appName, "--update-env"], {
     CONSENSUS_SERVER_URL: serverUrl,
     CONSENSUS_STATE_DIR: nodeStateDir,
     CONSENSUS_NODE_INSTALL_DIR: installDir,
@@ -244,7 +245,7 @@ async function offerStartPm2(rl: readline.Interface, installDir: string, serverU
     CONSENSUS_PM2_NAME: appName,
     CONSENSUS_NODE_UPDATE_COMMAND: path.join(installDir, "current", "scripts", "install-release.sh"),
   });
-  await run("pm2", ["save"], {});
+  await run(pm2, ["save"], {});
 
   console.log(`PM2 is managing ${appName}.`);
   console.log(`Logs: pm2 logs ${appName}`);
@@ -289,6 +290,35 @@ async function commandSucceeds(command: string, args: string[]): Promise<boolean
     child.on("exit", (code) => resolve(code === 0));
     child.on("error", () => resolve(false));
   });
+}
+
+async function resolveExecutable(command: string, fallbackPaths: string[] = []): Promise<string | null> {
+  const found = await which(command);
+  if (found) return found;
+
+  for (const candidate of fallbackPaths) {
+    if (await pathExists(candidate)) return candidate;
+  }
+
+  return null;
+}
+
+async function which(command: string): Promise<string | null> {
+  return await new Promise<string | null>((resolve) => {
+    const child = spawn("sh", ["-lc", `command -v ${shellQuote(command)}`], {
+      stdio: ["ignore", "pipe", "ignore"],
+    });
+    let stdout = "";
+    child.stdout.on("data", (chunk: Buffer) => {
+      stdout += chunk.toString();
+    });
+    child.on("exit", (code: number | null) => resolve(code === 0 ? stdout.trim() || null : null));
+    child.on("error", () => resolve(null));
+  });
+}
+
+function shellQuote(value: string): string {
+  return `'${value.replace(/'/g, `'\\''`)}'`;
 }
 
 async function question(rl: readline.Interface, prompt: string, fallback: string): Promise<string> {
