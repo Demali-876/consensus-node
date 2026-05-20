@@ -24,7 +24,7 @@ while true; do
   set -e
 
   if [[ "${code}" == "75" ]]; then
-    echo "Consensus node updated; restarting from ${install_dir}/current" >&2
+    echo "Consensus node update requested legacy restart; restarting from ${install_dir}/current" >&2
     sleep 1
     continue
   fi

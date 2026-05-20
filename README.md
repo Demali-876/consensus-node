@@ -145,10 +145,11 @@ verifies the release artifact, then replies `update_ready`. The server drains th
 node from routing and sends `update_apply` only when the router sees the node as
 idle.
 
-On apply, the node acknowledges, runs the installer, closes its control tunnel,
-and exits with code `75`. In production, run the node through PM2 with
-`ecosystem.config.cjs`; PM2 supervises `scripts/run-control.sh`, and the wrapper
-restarts from the new `current` symlink whenever it sees exit code `75`. If
+On apply, the node acknowledges, runs the installer, closes its control tunnel
+with WebSocket code `1012`, and exits cleanly with code `0`. In production, run
+the node through PM2 with `ecosystem.config.cjs`; PM2 supervises
+`scripts/run-control.sh` and restarts from the new `current` symlink. The wrapper
+still handles legacy exit code `75` for older releases during migration. If
 `CONSENSUS_NODE_UPDATE_COMMAND` is set, the node runs it before exiting with:
 
 ```txt

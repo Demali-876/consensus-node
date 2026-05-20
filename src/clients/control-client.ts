@@ -358,7 +358,8 @@ export async function startControlClient(options: ControlClientOptions) {
               target_version: preparedUpdate!.manifest.version,
             });
             connected.client.close(1012, "node update apply requested");
-            process.exit(75);
+            await sleep(250);
+            process.exit(0);
           } catch (error) {
             log.error("node-update", "apply-failed", {
               node_id: nodeId,
@@ -471,6 +472,10 @@ function sanitizeUrl(value: string): string {
   } catch {
     return value.length > 120 ? `${value.slice(0, 117)}...` : value;
   }
+}
+
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
 function parseRawTunnelTarget(value: string | undefined): { host: string; port: number } | null {
