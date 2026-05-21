@@ -27,6 +27,10 @@
     "test:benchmarks": "bun src/tests/benchmarks.test.ts",
     "test:streams": "bun src/tests/streams.test.ts",
     "test:update-reply-to": "bun src/tests/update-reply-to.test.ts",
+    "test:bug-ssrf-proxy": "bun src/tests/bug-ssrf-proxy.test.ts",
+    "test:bug-handshake-replay": "bun src/tests/bug-handshake-replay.test.ts",
+    "test:bug-stream-owner-linear-scan": "bun src/tests/bug-stream-owner-linear-scan.test.ts",
+    "test:bug-readjson-silent-corrupt": "bun src/tests/bug-readjson-silent-corrupt.test.ts",
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },
   "dependencies": {
