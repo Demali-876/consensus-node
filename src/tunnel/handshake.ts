@@ -12,6 +12,7 @@ import { TUNNEL_MODE, type TunnelMode, nowSeconds } from "./messages";
 
 export const HANDSHAKE_PROTOCOL = "consensus-node-tunnel";
 export const HANDSHAKE_VERSION = 1;
+export const HANDSHAKE_MAX_AGE_SECONDS = 300;
 
 export const HANDSHAKE_TYPE = {
   INIT:   "handshake_init",
@@ -276,6 +277,10 @@ function assertHandshakeBase(value: unknown, type: string): Record<string, unkno
   if (message.version !== HANDSHAKE_VERSION) throw new TypeError(`Unsupported handshake version: ${String(message.version)}`);
   if (typeof message.timestamp !== "number" || !Number.isFinite(message.timestamp)) {
     throw new TypeError("Handshake timestamp must be a finite number");
+  }
+  const ageSec = Math.abs(nowSeconds() - message.timestamp);
+  if (ageSec > HANDSHAKE_MAX_AGE_SECONDS) {
+    throw new TypeError(`Handshake timestamp is too old or in the future (age: ${ageSec}s, max: ${HANDSHAKE_MAX_AGE_SECONDS}s)`);
   }
   return message;
 }

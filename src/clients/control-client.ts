@@ -84,6 +84,8 @@ export async function startControlClient(options: ControlClientOptions) {
     ownerToServer: Map<number, string>;
     serverToOwner: Map<string, number>;
   }>();
+  // Reverse-index: owner stream_id → tunnelId.  Avoids O(n) scan of publicTunnelOwners.
+  const ownerStreamToTunnelId = new Map<string, string>();
   const publicTunnelStreams = new Map<string, { tunnelId: string; ownerStreamId: number }>();
   let preparedUpdate: {
     updateId: string;
@@ -123,6 +125,7 @@ export async function startControlClient(options: ControlClientOptions) {
     });
     rawStreams.clear();
     publicTunnelOwners.clear();
+    ownerStreamToTunnelId.clear();
     publicTunnelStreams.clear();
     activeStreams.clear();
     resolveClosed(event);
@@ -211,6 +214,7 @@ export async function startControlClient(options: ControlClientOptions) {
           ownerToServer: new Map(),
           serverToOwner: new Map(),
         });
+        ownerStreamToTunnelId.set(message.stream_id, target.tunnelId);
         log.info("control-client", "public-tunnel-owner-open", {
           node_id: nodeId,
           session_id: connected.sessionId,
@@ -333,8 +337,10 @@ export async function startControlClient(options: ControlClientOptions) {
     }
 
     if (message.type === MESSAGE_TYPE.STREAM_DATA) {
-      const ownerEntry = Array.from(publicTunnelOwners.entries())
-        .find(([, owner]) => owner.streamId === message.stream_id);
+      const ownerTunnelId = ownerStreamToTunnelId.get(message.stream_id);
+      const ownerEntry = ownerTunnelId !== undefined
+        ? ([ownerTunnelId, publicTunnelOwners.get(ownerTunnelId)!] as const)
+        : undefined;
       if (ownerEntry) {
         const [tunnelId, owner] = ownerEntry;
         try {
@@ -427,8 +433,10 @@ export async function startControlClient(options: ControlClientOptions) {
     }
 
     if (message.type === MESSAGE_TYPE.STREAM_CLOSE) {
-      const ownerEntry = Array.from(publicTunnelOwners.entries())
-        .find(([, owner]) => owner.streamId === message.stream_id);
+      const ownerTunnelIdClose = ownerStreamToTunnelId.get(message.stream_id);
+      const ownerEntry = ownerTunnelIdClose !== undefined
+        ? ([ownerTunnelIdClose, publicTunnelOwners.get(ownerTunnelIdClose)!] as const)
+        : undefined;
       if (ownerEntry) {
         const [tunnelId, owner] = ownerEntry;
         for (const serverStreamId of owner.serverToOwner.keys()) {
@@ -437,6 +445,7 @@ export async function startControlClient(options: ControlClientOptions) {
           void sendStreamClose(serverStreamId, "tunnel owner closed").catch(() => undefined);
         }
         publicTunnelOwners.delete(tunnelId);
+        ownerStreamToTunnelId.delete(message.stream_id);
         activeStreams.delete(message.stream_id);
         log.info("control-client", "public-tunnel-owner-closed", {
           node_id: nodeId,

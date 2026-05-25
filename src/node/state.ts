@@ -59,7 +59,7 @@ export async function readJson<T>(file: string, fallback: T): Promise<T> {
 
 export async function writeJson(file: string, value: unknown): Promise<void> {
   await fs.mkdir(path.dirname(file), { recursive: true });
-  await fs.writeFile(file, JSON.stringify(value, null, 2), "utf8");
+  await fs.writeFile(file, JSON.stringify(value, null, 2), { encoding: "utf8", mode: 0o600 });
 }
 
 export async function loadConfig(): Promise<NodeConfig> {

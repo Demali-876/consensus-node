@@ -1,7 +1,12 @@
 import type { ProxyRequestMessage, ProxyResponseMessage } from "../tunnel/messages";
 import { MESSAGE_TYPE, nowSeconds } from "../tunnel/messages";
+import { isBlockedProxyUrl } from "./proxy-guard";
 
 export async function executeProxyCommand(message: ProxyRequestMessage): Promise<ProxyResponseMessage> {
+  if (isBlockedProxyUrl(message.target_url)) {
+    throw new Error(`Proxy target URL is not allowed: ${message.target_url}`);
+  }
+
   const method = (message.method || "GET").toUpperCase();
   const start = performance.now();
   const body = decodeBody(message.body, message.body_encoding);

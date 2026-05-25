@@ -1,4 +1,5 @@
 import type { FastifyInstance } from "fastify";
+import { isBlockedProxyUrl } from "./proxy-guard";
 
 export async function registerProxyRoutes(app: FastifyInstance): Promise<void> {
   app.post("/proxy", async (request, reply) => {
@@ -10,6 +11,9 @@ export async function registerProxyRoutes(app: FastifyInstance): Promise<void> {
     };
 
     if (!body?.target_url) return reply.code(400).send({ error: "Missing target_url" });
+    if (isBlockedProxyUrl(body.target_url)) {
+      return reply.code(400).send({ error: "Target URL is not allowed" });
+    }
 
     const method = (body.method || "GET").toUpperCase();
     const start = performance.now();
