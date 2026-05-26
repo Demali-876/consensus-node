@@ -13,6 +13,8 @@ import { TUNNEL_MODE, type TunnelMode, nowSeconds } from "./messages";
 export const HANDSHAKE_PROTOCOL = "consensus-node-tunnel";
 export const HANDSHAKE_VERSION = 1;
 
+const HANDSHAKE_MAX_CLOCK_SKEW_SECONDS = 300; // 5 minutes
+
 export const HANDSHAKE_TYPE = {
   INIT:   "handshake_init",
   ACCEPT: "handshake_accept",
@@ -276,6 +278,12 @@ function assertHandshakeBase(value: unknown, type: string): Record<string, unkno
   if (message.version !== HANDSHAKE_VERSION) throw new TypeError(`Unsupported handshake version: ${String(message.version)}`);
   if (typeof message.timestamp !== "number" || !Number.isFinite(message.timestamp)) {
     throw new TypeError("Handshake timestamp must be a finite number");
+  }
+  const nowSecs = Math.floor(Date.now() / 1000);
+  if (Math.abs(nowSecs - message.timestamp) > HANDSHAKE_MAX_CLOCK_SKEW_SECONDS) {
+    throw new TypeError(
+      `Handshake timestamp is outside acceptable window (skew: ${nowSecs - (message.timestamp as number)}s, max: ±${HANDSHAKE_MAX_CLOCK_SKEW_SECONDS}s)`,
+    );
   }
   return message;
 }

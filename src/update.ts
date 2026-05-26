@@ -61,7 +61,7 @@ export function compareManifests(current: ReleaseManifest, required: ReleaseMani
   if (current.platform !== required.platform) reasons.push("platform");
   if (current.commit !== required.commit) reasons.push("commit");
   if (current.routes_hash !== required.routes_hash) reasons.push("routes_hash");
-  if (required.tarball_sha256 && current.tarball_sha256 !== required.tarball_sha256) {
+  if (current.tarball_sha256 !== required.tarball_sha256) {
     reasons.push("tarball_sha256");
   }
 
@@ -87,7 +87,10 @@ export async function downloadAndVerify(manifest: ReleaseManifest): Promise<{ pa
 
   const bytes = Buffer.from(await response.arrayBuffer());
   const sha256 = crypto.createHash("sha256").update(bytes).digest("hex");
-  if (manifest.tarball_sha256 && sha256 !== stripShaPrefix(manifest.tarball_sha256)) {
+  if (!manifest.tarball_sha256) {
+    throw new Error("Manifest is missing tarball_sha256; refusing to install artifact without integrity verification");
+  }
+  if (sha256 !== stripShaPrefix(manifest.tarball_sha256)) {
     throw new Error(`Artifact SHA-256 mismatch: expected ${manifest.tarball_sha256}, got ${sha256}`);
   }
 

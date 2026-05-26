@@ -1,4 +1,4 @@
-import { FRAME_TYPE, type FrameType , peekFrameSequence} from "./frames";
+import { FRAME_TYPE, type FrameType } from "./frames";
 import {
   MESSAGE_TYPE,
   createErrorMessage,
@@ -122,10 +122,10 @@ export class TunnelClient {
 
   private async handleRawMessage(data: unknown): Promise<void> {
     const raw = await toBuffer(data);
-    if (peekFrameSequence(raw) <= this.lastReceiveSequence) { 
+    const { frame, plaintext } = openFrame(this.options.session.receiveKey, raw);
+    if (frame.sequence <= this.lastReceiveSequence) {
       throw new Error("Replay or out-of-order tunnel frame rejected");
     }
-    const { frame, plaintext } = openFrame(this.options.session.receiveKey, raw);
     this.lastReceiveSequence = frame.sequence;
 
     if (frame.type === FRAME_TYPE.PING) {
