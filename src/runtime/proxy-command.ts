@@ -1,6 +1,8 @@
 import type { ProxyRequestMessage, ProxyResponseMessage } from "../tunnel/messages";
 import { MESSAGE_TYPE, nowSeconds } from "../tunnel/messages";
 
+const MAX_PROXY_RESPONSE_BYTES = 50 * 1024 * 1024; // 50 MB
+
 export async function executeProxyCommand(message: ProxyRequestMessage): Promise<ProxyResponseMessage> {
   const method = (message.method || "GET").toUpperCase();
   const start = performance.now();
@@ -16,7 +18,21 @@ export async function executeProxyCommand(message: ProxyRequestMessage): Promise
     signal: AbortSignal.timeout(30_000),
   });
 
+  const contentLength = response.headers.get("content-length");
+  if (contentLength !== null) {
+    const cl = parseInt(contentLength, 10);
+    if (Number.isFinite(cl) && cl > MAX_PROXY_RESPONSE_BYTES) {
+      throw new Error(
+        `Proxy response too large: content-length ${cl} bytes exceeds limit of ${MAX_PROXY_RESPONSE_BYTES} bytes`,
+      );
+    }
+  }
   const responseBody = Buffer.from(await response.arrayBuffer());
+  if (responseBody.length > MAX_PROXY_RESPONSE_BYTES) {
+    throw new Error(
+      `Proxy response too large: ${responseBody.length} bytes exceeds limit of ${MAX_PROXY_RESPONSE_BYTES} bytes`,
+    );
+  }
 
   return {
     type: MESSAGE_TYPE.PROXY_RESPONSE,

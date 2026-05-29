@@ -12,6 +12,7 @@ import { TUNNEL_MODE, type TunnelMode, nowSeconds } from "./messages";
 
 export const HANDSHAKE_PROTOCOL = "consensus-node-tunnel";
 export const HANDSHAKE_VERSION = 1;
+export const MAX_HANDSHAKE_CLOCK_SKEW_SECONDS = 300;
 
 export const HANDSHAKE_TYPE = {
   INIT:   "handshake_init",
@@ -276,6 +277,12 @@ function assertHandshakeBase(value: unknown, type: string): Record<string, unkno
   if (message.version !== HANDSHAKE_VERSION) throw new TypeError(`Unsupported handshake version: ${String(message.version)}`);
   if (typeof message.timestamp !== "number" || !Number.isFinite(message.timestamp)) {
     throw new TypeError("Handshake timestamp must be a finite number");
+  }
+  const skew = Math.abs((message.timestamp as number) - nowSeconds());
+  if (skew > MAX_HANDSHAKE_CLOCK_SKEW_SECONDS) {
+    throw new TypeError(
+      `Handshake timestamp is stale (skew: ${skew}s, max: ${MAX_HANDSHAKE_CLOCK_SKEW_SECONDS}s)`,
+    );
   }
   return message;
 }
