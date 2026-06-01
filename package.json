@@ -27,6 +27,10 @@
     "test:benchmarks": "bun src/tests/benchmarks.test.ts",
     "test:streams": "bun src/tests/streams.test.ts",
     "test:update-reply-to": "bun src/tests/update-reply-to.test.ts",
+    "test:handshake-timestamp": "bun src/tests/handshake-timestamp.test.ts",
+    "test:public-tunnel-scan": "bun src/tests/public-tunnel-scan.test.ts",
+    "test:state-atomic-write": "bun src/tests/state-atomic-write.test.ts",
+    "test:stream-lifecycle": "bun src/tests/stream-lifecycle.test.ts",
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },
   "dependencies": {
