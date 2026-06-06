@@ -27,6 +27,7 @@
     "test:benchmarks": "bun src/tests/benchmarks.test.ts",
     "test:streams": "bun src/tests/streams.test.ts",
     "test:update-reply-to": "bun src/tests/update-reply-to.test.ts",
+    "test:bugs-2026-06-06": "bun src/tests/bugs-2026-06-06.test.ts",
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },
   "dependencies": {
