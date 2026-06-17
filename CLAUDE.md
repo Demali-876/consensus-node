@@ -2,7 +2,7 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
-**Canonical cross-repo reference:** the architecture + cross-repo contracts live in `consensus-docs` → https://docs.consensus.canister.software/protocol/architecture/ ([source](https://github.com/canister-software/consensus-docs/blob/main/src/content/docs/protocol/architecture.md)). Read it before changing the tunnel handshake/frames/messages (`src/tunnel/`, `src/crypto/`) or the routing-ticket format — those must stay compatible with `consensus` (`server/features/node-tunnel/`). Related repos: [`consensus`](https://github.com/Demali-876/consensus) (orchestrator), [`consensus-client`](https://github.com/Demali-876/consensus-client) (SDK + CLI), [`consensus-docs`](https://github.com/canister-software/consensus-docs) (docs).
+**Canonical cross-repo reference:** the architecture + cross-repo contracts live in `consensus-docs` → https://docs.consensus.canister.software/protocol/architecture/ ([source](https://github.com/canister-software/consensus-docs/blob/main/src/content/docs/protocol/architecture.md)). Read it before changing the tunnel handshake/frames/messages (`src/tunnel/`, `src/crypto/`) or the routing-ticket format — those must stay compatible with `consensus` (`server/features/node-tunnel/`). Related repos: [`consensus`](https://github.com/Demali-876/consensus) (orchestrator), [`consensus-client`](https://github.com/Demali-876/consensus-client) (SDK + CLI), [`consensus-docs`](https://github.com/canister-software/consensus-docs) (docs), [`consensus-facilitator`](https://github.com/Demali-876/consensus-facilitator) (x402 facilitator).
 
 ## Project
 
