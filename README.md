@@ -1,9 +1,12 @@
 # Consensus Node
 
-Verifiable Bun worker node runtime for the Consensus network.
+Verifiable Bun worker node runtime for the [Consensus Protocol](https://github.com/Demali-876/consensus). Nodes register with the orchestrator and serve proxied requests for the network.
 
-This package is intentionally separate from `instance/`, which remains as a reference
-implementation while this runtime is built from scratch.
+**Part of Consensus:** [consensus](https://github.com/Demali-876/consensus) (orchestrator/server) · [consensus-client](https://github.com/Demali-876/consensus-client) (CLI + SDK) · **consensus-node** (this repo).
+
+This runtime is built from scratch and is separate from the `instance/` reference implementation that lives in the `consensus` monorepo.
+
+> **Architecture direction (in progress):** the data path is moving so clients connect **directly to nodes** instead of the orchestrator relaying everything over the control tunnel. The orchestrator stays the control plane (auth, x402 payment, node selection, signed tickets); each node will host its own reachable data endpoint, enforce SSRF locally (the `consensus` SSRF guard is being ported into this runtime), and keep a per-node cache. Until that lands, nodes serve work over the encrypted control tunnel as described below.
 
 ## Development
 
