@@ -1,0 +1,242 @@
+{
+  "node_id": "node-resp",
+  "node_public_key_pem": "-----BEGIN PUBLIC KEY-----\nMCowBQYDK2VwAyEA6kpsY+KcUgq+9VB7Ey7F+ZVHdq6+vnuSQh7qaRRG0iw=\n-----END PUBLIC KEY-----\n",
+  "vectors": [
+    {
+      "name": "valid",
+      "challenge": {
+        "protocol": "consensus-node-responder-auth",
+        "version": 1,
+        "node_id": "node-resp",
+        "client_nonce": "AQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQE=",
+        "timestamp": 1700000000
+      },
+      "proof": {
+        "protocol": "consensus-node-responder-auth",
+        "version": 1,
+        "node_id": "node-resp",
+        "client_nonce": "AQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQE=",
+        "node_nonce": "AgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgI=",
+        "timestamp": 1700000000,
+        "signature": "HkB7dMCQV86lkht3ixDuHb4iS07WC8XojCix6ix+nA7lDm3e4qnJMtGiwmrc//xrY9UKJbyFEZ1a5QqNaSUWDg=="
+      },
+      "verify": {
+        "now": 1700000001
+      },
+      "expect": {
+        "ok": true
+      }
+    },
+    {
+      "name": "valid-channel-bound",
+      "challenge": {
+        "protocol": "consensus-node-responder-auth",
+        "version": 1,
+        "node_id": "node-resp",
+        "client_nonce": "AQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQE=",
+        "timestamp": 1700000000,
+        "channel_binding": "AwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwM="
+      },
+      "proof": {
+        "protocol": "consensus-node-responder-auth",
+        "version": 1,
+        "node_id": "node-resp",
+        "client_nonce": "AQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQE=",
+        "node_nonce": "AgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgI=",
+        "timestamp": 1700000000,
+        "channel_binding": "AwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwM=",
+        "signature": "gOhpctKYWrZP3zMHcqoE7peJGE1JTd3mYcb/OeQ59rkB3NbKX0ed50Rf+8yLcjcrAW+2qSgewh2lQqmsZt1+Cg=="
+      },
+      "verify": {
+        "now": 1700000001
+      },
+      "expect": {
+        "ok": true
+      }
+    },
+    {
+      "name": "wrong-key",
+      "challenge": {
+        "protocol": "consensus-node-responder-auth",
+        "version": 1,
+        "node_id": "node-resp",
+        "client_nonce": "AQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQE=",
+        "timestamp": 1700000000
+      },
+      "proof": {
+        "protocol": "consensus-node-responder-auth",
+        "version": 1,
+        "node_id": "node-resp",
+        "client_nonce": "AQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQE=",
+        "node_nonce": "AgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgI=",
+        "timestamp": 1700000000,
+        "signature": "zW8KhWeoKRob8tMXINNyiev3vqQOBeff9VDAwI5undsKw+4XsOvVCKfHn6kHSSqCvrlUyKriEFtf+ndAIHltAQ=="
+      },
+      "verify": {
+        "now": 1700000001
+      },
+      "expect": {
+        "ok": false,
+        "error": "signature"
+      }
+    },
+    {
+      "name": "tampered",
+      "challenge": {
+        "protocol": "consensus-node-responder-auth",
+        "version": 1,
+        "node_id": "node-resp",
+        "client_nonce": "AQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQE=",
+        "timestamp": 1700000000
+      },
+      "proof": {
+        "protocol": "consensus-node-responder-auth",
+        "version": 1,
+        "node_id": "node-resp",
+        "client_nonce": "AQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQE=",
+        "node_nonce": "AgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgI=",
+        "timestamp": 1700000000,
+        "signature": "AkB7dMCQV86lkht3ixDuHb4iS07WC8XojCix6ix+nA7lDm3e4qnJMtGiwmrc//xrY9UKJbyFEZ1a5QqNaSUWDg=="
+      },
+      "verify": {
+        "now": 1700000001
+      },
+      "expect": {
+        "ok": false,
+        "error": "signature"
+      }
+    },
+    {
+      "name": "client-nonce-mismatch",
+      "challenge": {
+        "protocol": "consensus-node-responder-auth",
+        "version": 1,
+        "node_id": "node-resp",
+        "client_nonce": "BQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQU=",
+        "timestamp": 1700000000
+      },
+      "proof": {
+        "protocol": "consensus-node-responder-auth",
+        "version": 1,
+        "node_id": "node-resp",
+        "client_nonce": "AQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQE=",
+        "node_nonce": "AgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgI=",
+        "timestamp": 1700000000,
+        "signature": "HkB7dMCQV86lkht3ixDuHb4iS07WC8XojCix6ix+nA7lDm3e4qnJMtGiwmrc//xrY9UKJbyFEZ1a5QqNaSUWDg=="
+      },
+      "verify": {
+        "now": 1700000001
+      },
+      "expect": {
+        "ok": false,
+        "error": "client_nonce"
+      }
+    },
+    {
+      "name": "channel-binding-mismatch",
+      "challenge": {
+        "protocol": "consensus-node-responder-auth",
+        "version": 1,
+        "node_id": "node-resp",
+        "client_nonce": "AQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQE=",
+        "timestamp": 1700000000
+      },
+      "proof": {
+        "protocol": "consensus-node-responder-auth",
+        "version": 1,
+        "node_id": "node-resp",
+        "client_nonce": "AQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQE=",
+        "node_nonce": "AgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgI=",
+        "timestamp": 1700000000,
+        "channel_binding": "AwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwM=",
+        "signature": "gOhpctKYWrZP3zMHcqoE7peJGE1JTd3mYcb/OeQ59rkB3NbKX0ed50Rf+8yLcjcrAW+2qSgewh2lQqmsZt1+Cg=="
+      },
+      "verify": {
+        "now": 1700000001
+      },
+      "expect": {
+        "ok": false,
+        "error": "channel_binding"
+      }
+    },
+    {
+      "name": "expired",
+      "challenge": {
+        "protocol": "consensus-node-responder-auth",
+        "version": 1,
+        "node_id": "node-resp",
+        "client_nonce": "AQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQE=",
+        "timestamp": 1700000000
+      },
+      "proof": {
+        "protocol": "consensus-node-responder-auth",
+        "version": 1,
+        "node_id": "node-resp",
+        "client_nonce": "AQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQE=",
+        "node_nonce": "AgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgI=",
+        "timestamp": 1700000000,
+        "signature": "HkB7dMCQV86lkht3ixDuHb4iS07WC8XojCix6ix+nA7lDm3e4qnJMtGiwmrc//xrY9UKJbyFEZ1a5QqNaSUWDg=="
+      },
+      "verify": {
+        "now": 1700000100
+      },
+      "expect": {
+        "ok": false,
+        "error": "expired"
+      }
+    },
+    {
+      "name": "future",
+      "challenge": {
+        "protocol": "consensus-node-responder-auth",
+        "version": 1,
+        "node_id": "node-resp",
+        "client_nonce": "AQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQE=",
+        "timestamp": 1700000000
+      },
+      "proof": {
+        "protocol": "consensus-node-responder-auth",
+        "version": 1,
+        "node_id": "node-resp",
+        "client_nonce": "AQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQE=",
+        "node_nonce": "AgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgI=",
+        "timestamp": 1700000100,
+        "signature": "txFzlnqIvNYt2SkNdHf4M8S8XSM06wtSh/xcLXKfuAZa6Ms8+v91ObD7RotJUFzOoXc4JPWhjcJmjn/Hyp5jAg=="
+      },
+      "verify": {
+        "now": 1700000001
+      },
+      "expect": {
+        "ok": false,
+        "error": "future"
+      }
+    },
+    {
+      "name": "node-id-mismatch",
+      "challenge": {
+        "protocol": "consensus-node-responder-auth",
+        "version": 1,
+        "node_id": "node-resp",
+        "client_nonce": "AQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQE=",
+        "timestamp": 1700000000
+      },
+      "proof": {
+        "protocol": "consensus-node-responder-auth",
+        "version": 1,
+        "node_id": "node-resp",
+        "client_nonce": "AQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQE=",
+        "node_nonce": "AgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgI=",
+        "timestamp": 1700000000,
+        "signature": "HkB7dMCQV86lkht3ixDuHb4iS07WC8XojCix6ix+nA7lDm3e4qnJMtGiwmrc//xrY9UKJbyFEZ1a5QqNaSUWDg=="
+      },
+      "verify": {
+        "expectedNodeId": "ghost",
+        "now": 1700000001
+      },
+      "expect": {
+        "ok": false,
+        "error": "node_id"
+      }
+    }
+  ]
+}
