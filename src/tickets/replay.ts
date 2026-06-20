@@ -12,7 +12,18 @@ export class JtiReplayCache {
   consume(jti: string, expSec: number, nowSec: number): boolean {
     this.sweep(nowSec);
     if (this.seen.has(jti)) return false;
-    if (this.seen.size >= this.maxEntries) this.sweep(nowSec, true);
+    if (this.seen.size >= this.maxEntries) {
+      // Drop expired entries first; if every entry is still unexpired, evict the
+      // oldest (soonest-expiring → smallest residual replay window) so the bound
+      // is hard. Filling the cache requires that many valid signed tickets, which
+      // the orchestrator only issues against payment, so this path is bounded.
+      this.sweep(nowSec, true);
+      while (this.seen.size >= this.maxEntries) {
+        const oldest = this.seen.keys().next().value;
+        if (oldest === undefined) break;
+        this.seen.delete(oldest);
+      }
+    }
     this.seen.set(jti, expSec);
     return true;
   }

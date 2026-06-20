@@ -60,4 +60,15 @@ assert.throws(
 );
 checks += 2;
 
-console.log(`tickets.test.ts: ${checks} checks passed — shared vectors verify under Bun + replay enforced`);
+// 3) Replay cache enforces maxEntries by evicting the oldest entry (even when
+// nothing has expired), so the map can't grow without bound under valid load.
+const bounded = new JtiReplayCache(2);
+const farFuture = 9_999_999_999;
+assert.ok(bounded.consume('a', farFuture, 1000), 'a is fresh');
+assert.ok(bounded.consume('b', farFuture, 1000), 'b is fresh');
+assert.ok(bounded.consume('c', farFuture, 1000), 'c is fresh (evicts oldest)');
+assert.equal(bounded.size, 2, 'cache stays bounded at maxEntries with all entries unexpired');
+assert.equal(bounded.consume('b', farFuture, 1000), false, 'still-cached jti rejected as replay');
+checks += 5;
+
+console.log(`tickets.test.ts: ${checks} checks passed — shared vectors verify under Bun + replay enforced + bounded`);
