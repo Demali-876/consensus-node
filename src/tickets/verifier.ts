@@ -1,7 +1,7 @@
 // Node-side routing-ticket verification: the orchestrator's signed-ticket
 // contract (mirrored ./ticket, locked by ./test-vectors/tickets.vectors.json)
 // plus jti replay protection. The orchestrator's public key is pinned at
-// registration (wired in a later step); pass it in here.
+// registration (./orchestrator-key.ts → loadPinnedOrchestratorKey); pass it in here.
 
 import type { KeyObject } from 'node:crypto';
 import { verifyTicket, type VerifiedTicket, type VerifyTicketOptions } from './ticket';

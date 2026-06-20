@@ -30,6 +30,7 @@
     "test:ssrf": "bun src/tests/ssrf.test.ts",
     "test:tickets": "bun src/tests/tickets.test.ts",
     "test:dedupe": "bun src/tests/dedupe.test.ts",
+    "test:pin": "bun src/tests/pin.test.ts",
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },
   "dependencies": {
