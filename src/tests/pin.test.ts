@@ -4,11 +4,11 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 
-import { saveConfig } from "../node/state";
+import { loadConfig, saveConfig } from "../node/state";
 import { issueTicket } from "../tickets/ticket";
 import { verifyRoutingTicket } from "../tickets/verifier";
 import { JtiReplayCache } from "../tickets/replay";
-import { loadPinnedOrchestratorKey } from "../tickets/orchestrator-key";
+import { loadPinnedOrchestratorKey, resolvePinnedPubkey } from "../tickets/orchestrator-key";
 import type { OrchestratorPublicJwk } from "../types";
 
 // Isolate on-disk state so this test never touches a real ~/.consensus/node.
@@ -82,6 +82,27 @@ assert.throws(
   "ticket from a non-pinned key is rejected",
 );
 checks++;
+
+// 5) Re-registration against a key-less response (older server / FREE_MODE) must
+// NOT wipe the pinned trust anchor — the regression this guards against.
+const before = await loadConfig();
+await saveConfig({
+  ...before,
+  orchestrator_pubkey: resolvePinnedPubkey(before.orchestrator_pubkey, undefined),
+});
+const stillPinned = await loadPinnedOrchestratorKey();
+assert.ok(stillPinned, "key-less re-registration preserves the pinned key");
+assert.equal(stillPinned.kid, kid, "preserved pin keeps its kid");
+checks += 2;
+
+// 6) resolvePinnedPubkey decision table: only an explicit key rotates the pin.
+const rotated = publicJwk(impostor.publicKey, "kid-2");
+assert.equal(resolvePinnedPubkey(pinJwk, rotated), rotated, "explicit key rotates the pin");
+assert.equal(resolvePinnedPubkey(pinJwk, null), pinJwk, "null response preserves existing");
+assert.equal(resolvePinnedPubkey(pinJwk, undefined), pinJwk, "missing response preserves existing");
+assert.equal(resolvePinnedPubkey(undefined, rotated), rotated, "first pin with no prior anchor");
+assert.equal(resolvePinnedPubkey(null, null), null, "no key anywhere stays null");
+checks += 5;
 
 fs.rmSync(tmp, { recursive: true, force: true });
 

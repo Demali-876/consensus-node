@@ -1,6 +1,7 @@
 import { loadOrCreateIdentity } from "../crypto/identity";
 import { capabilitiesRecord } from "../runtime/capabilities";
 import { loadConfig, loadJoinAuthorization, saveConfig, type JoinAuthorization } from "../node/state";
+import { resolvePinnedPubkey } from "../tickets/orchestrator-key";
 import type { OrchestratorPublicJwk } from "../types";
 
 export interface RegisterNodeOptions {
@@ -85,7 +86,9 @@ export async function registerNode(options: RegisterNodeOptions): Promise<JoinRe
     port: body.port,
     registered_at: new Date().toISOString(),
     benchmark_score: body.benchmark_score,
-    orchestrator_pubkey: body.orchestrator_pubkey ?? null,
+    // Preserve a prior trust anchor unless the response carries a replacement —
+    // a key-less response (older server / FREE_MODE) must not wipe the pin.
+    orchestrator_pubkey: resolvePinnedPubkey(existing.orchestrator_pubkey, body.orchestrator_pubkey),
   });
 
   return body;

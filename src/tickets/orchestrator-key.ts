@@ -23,6 +23,17 @@ export function importOrchestratorJwk(jwk: OrchestratorPublicJwk): KeyObject {
   return key;
 }
 
+/** Decide which pinned key to keep when re-persisting config on (re-)registration.
+ *  A join response that omits the key (older server / FREE_MODE) must NOT wipe a
+ *  previously pinned trust anchor — only an explicit replacement key in the
+ *  response rotates it. Fail-closed toward keeping the known-good key. */
+export function resolvePinnedPubkey(
+  existing: OrchestratorPublicJwk | null | undefined,
+  fromResponse: OrchestratorPublicJwk | null | undefined,
+): OrchestratorPublicJwk | null {
+  return fromResponse ?? existing ?? null;
+}
+
 /** The pinned orchestrator key from node config, or null if none was stored
  *  (older server, FREE_MODE dev, or not yet registered). */
 export async function loadPinnedOrchestratorKey(): Promise<PinnedOrchestratorKey | null> {
