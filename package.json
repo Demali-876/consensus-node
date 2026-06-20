@@ -29,6 +29,7 @@
     "test:update-reply-to": "bun src/tests/update-reply-to.test.ts",
     "test:ssrf": "bun src/tests/ssrf.test.ts",
     "test:tickets": "bun src/tests/tickets.test.ts",
+    "test:dedupe": "bun src/tests/dedupe.test.ts",
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },
   "dependencies": {
