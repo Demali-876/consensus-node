@@ -5,6 +5,17 @@ export type NodeCapability =
   | "tunnels"
   | "ip_leasing";
 
+/** Orchestrator Ed25519 verification key (OKP public JWK), pinned at join.
+ *  Mirrors `publicJwk()` in consensus/server/features/tickets/keys.ts. */
+export interface OrchestratorPublicJwk {
+  kty: string;
+  crv: string;
+  x: string;
+  use?: string;
+  alg?: string;
+  kid?: string;
+}
+
 export interface NodeConfig {
   node_id?: string;
   domain?: string;
@@ -15,6 +26,9 @@ export interface NodeConfig {
   registered_at?: string;
   commissioned_at?: string;
   benchmark_score?: number;
+  /** Pinned at registration; used to verify routing tickets. Null/absent until
+   *  a join response carries it (e.g. older server, or FREE_MODE dev). */
+  orchestrator_pubkey?: OrchestratorPublicJwk | null;
 }
 
 export interface ReleaseManifest {

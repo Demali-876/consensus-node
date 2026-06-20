@@ -1,6 +1,7 @@
 import { loadOrCreateIdentity } from "../crypto/identity";
 import { capabilitiesRecord } from "../runtime/capabilities";
 import { loadConfig, loadJoinAuthorization, saveConfig, type JoinAuthorization } from "../node/state";
+import type { OrchestratorPublicJwk } from "../types";
 
 export interface RegisterNodeOptions {
   serverUrl: string;
@@ -39,6 +40,7 @@ export interface JoinResponse {
   region: string;
   status: string;
   benchmark_score: number;
+  orchestrator_pubkey?: OrchestratorPublicJwk | null;
   join_request_id?: string | null;
   processing_time_ms: number;
 }
@@ -83,6 +85,7 @@ export async function registerNode(options: RegisterNodeOptions): Promise<JoinRe
     port: body.port,
     registered_at: new Date().toISOString(),
     benchmark_score: body.benchmark_score,
+    orchestrator_pubkey: body.orchestrator_pubkey ?? null,
   });
 
   return body;
