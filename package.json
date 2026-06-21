@@ -31,6 +31,8 @@
     "test:tickets": "bun src/tests/tickets.test.ts",
     "test:dedupe": "bun src/tests/dedupe.test.ts",
     "test:pin": "bun src/tests/pin.test.ts",
+    "test:responder-auth": "bun src/tests/responder-auth.test.ts",
+    "gen:responder-auth-vectors": "bun src/tunnel/gen-responder-auth-vectors.ts",
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },
   "dependencies": {
