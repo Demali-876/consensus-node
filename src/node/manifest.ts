@@ -29,7 +29,11 @@ export const REQUIRED_ROUTES = [
   "GET /benchmark/system",
   "POST /benchmark/memory-test",
   "POST /benchmark/memory-pressure",
-  "POST /proxy"
+  "POST /proxy",
+  // Direct data-plane WebSocket endpoint (DATA_PLANE_PATH in tunnel/data-plane.ts).
+  // A build without it must not present the same routes_hash, so the orchestrator
+  // can detect that direct client connections are unsupported.
+  "GET /connect"
 ] as const;
 
 export function platform(): string {
