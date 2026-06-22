@@ -6,6 +6,9 @@ import { integrityPayload } from "../node/integrity";
 import { capabilitiesRecord } from "./capabilities";
 import { registerBenchmarkRoutes } from "./benchmarks/routes";
 import { registerProxyRoutes } from "./proxy-worker";
+import { registerDataPlaneRoute } from "./data-route";
+import { loadOrCreateIdentity } from "../crypto/identity";
+import { loadPinnedOrchestratorKey } from "../tickets/orchestrator-key";
 
 export async function buildServer() {
   const app = Fastify({ logger: true });
@@ -36,6 +39,18 @@ export async function buildServer() {
 
   await registerBenchmarkRoutes(app);
   await registerProxyRoutes(app);
+
+  // Client-facing data plane: encrypted, node-authenticated, ticket-gated proxy.
+  registerDataPlaneRoute(app, {
+    resolve: async () => {
+      const config = await loadConfig();
+      if (!config.node_id) throw new Error("node is not registered");
+      const pinned = await loadPinnedOrchestratorKey();
+      if (!pinned) throw new Error("no pinned orchestrator key");
+      const identity = await loadOrCreateIdentity();
+      return { nodeId: config.node_id, identity, pinnedKey: pinned.key };
+    },
+  });
 
   return app;
 }
