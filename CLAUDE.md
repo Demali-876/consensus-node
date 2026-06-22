@@ -6,7 +6,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project
 
-Verifiable Bun worker node runtime for the Consensus network. Written from scratch (the `instance/` directory in the wider monorepo is a reference implementation, not used here). Runtime: Bun ≥1.2, TypeScript strict, ESM, `moduleResolution: "Bundler"`. Source is run directly with `bun src/<entry>.ts` — there is no build step for local development; `tsc` is used only for type-checking (`bun run typecheck`).
+Verifiable Bun worker node runtime for the Consensus network. Written from scratch (the `instance/` directory in the wider monorepo is a reference implementation, not used here). Runtime: Bun ≥1.3, TypeScript strict, ESM, `moduleResolution: "Bundler"`. Source is run directly with `bun src/<entry>.ts` — there is no build step for local development; `tsc` is used only for type-checking (`bun run typecheck`).
 
 ## Commands
 

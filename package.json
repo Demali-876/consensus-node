@@ -34,6 +34,7 @@
     "test:responder-auth": "bun src/tests/responder-auth.test.ts",
     "test:data-handshake": "bun src/tests/data-handshake.test.ts",
     "test:request-ticket": "bun src/tests/request-ticket.test.ts",
+    "test:proxy-serve": "bun src/tests/proxy-serve.test.ts",
     "gen:responder-auth-vectors": "bun src/tunnel/gen-responder-auth-vectors.ts",
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },
@@ -47,7 +48,7 @@
     "typescript": "^5.9.3"
   },
   "engines": {
-    "bun": ">=1.2.0"
+    "bun": ">=1.3.0"
   },
   "files": [
     "src/",
