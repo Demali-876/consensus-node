@@ -37,6 +37,7 @@
     "test:proxy-serve": "bun src/tests/proxy-serve.test.ts",
     "test:data-plane": "bun src/tests/data-plane.test.ts",
     "gen:responder-auth-vectors": "bun src/tunnel/gen-responder-auth-vectors.ts",
+    "gen:data-handshake-vectors": "bun src/tunnel/gen-data-handshake-vectors.ts",
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },
   "dependencies": {

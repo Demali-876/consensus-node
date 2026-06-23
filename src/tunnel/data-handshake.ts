@@ -196,7 +196,15 @@ export async function deriveClientDataSession(input: {
   return session;
 }
 
-function channelBinding(input: {
+/**
+ * The handshake transcript: a SHA-256 over both ephemeral public keys and both
+ * nonces, bound to protocol/version/node_id. It seeds the session HKDF and is the
+ * responder-auth `channel_binding` the node signs. Exported so the cross-runtime
+ * vectors (test-vectors/data-handshake.vectors.json) can pin these exact bytes —
+ * the value a MITM cannot forge without invalidating the signed proof. Treats the
+ * public keys as opaque base64, so deterministic vectors need no real EC points.
+ */
+export function channelBinding(input: {
   nodeId: string;
   clientPublicKey: string;
   clientNonce: string;
