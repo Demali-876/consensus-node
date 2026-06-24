@@ -1,8 +1,12 @@
 import assert from "node:assert/strict";
 import crypto from "node:crypto";
+import fs from "node:fs";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
 
 import {
   acceptDataInit,
+  channelBinding,
   createDataInit,
   deriveClientDataSession,
   type DataAcceptMessage,
@@ -21,6 +25,34 @@ function newIdentity(): NodeIdentity {
 const NODE_ID = "node-x";
 const identity = newIdentity();
 let checks = 0;
+
+// 0) Shared channel-binding vectors: consensus-client must compute the exact
+// bytes the node binds the session to and signs in its proof — byte-for-byte.
+// Pairs with responder-auth.vectors.json (which pins a proof over such a binding).
+{
+  const here = path.dirname(fileURLToPath(import.meta.url));
+  const fixture = JSON.parse(
+    fs.readFileSync(path.join(here, "../tunnel/test-vectors/data-handshake.vectors.json"), "utf8"),
+  ) as { vectors: Array<{ name: string; input: Record<string, string>; channel_binding: string }> };
+
+  const seen = new Set<string>();
+  for (const v of fixture.vectors) {
+    const binding = channelBinding({
+      nodeId: v.input.node_id,
+      clientPublicKey: v.input.client_public_key,
+      clientNonce: v.input.client_nonce,
+      nodePublicKey: v.input.node_public_key,
+      nodeNonce: v.input.node_nonce,
+    }).toString("base64");
+    assert.equal(binding, v.channel_binding, `vector ${v.name} channel binding must match`);
+    seen.add(binding);
+    checks++;
+  }
+  // Distinct inputs must yield distinct bindings — proves every field feeds the
+  // hash (a constant return would pass the equality check above but fail here).
+  assert.equal(seen.size, fixture.vectors.length, "each vector's inputs produce a distinct binding");
+  checks++;
+}
 
 // 1) Happy path: both sides derive the same session and the proof verifies
 // against the pinned key.

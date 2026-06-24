@@ -1,0 +1,39 @@
+{
+  "protocol": "consensus-data-plane",
+  "version": 1,
+  "vectors": [
+    {
+      "name": "baseline",
+      "input": {
+        "node_id": "node-data",
+        "client_public_key": "ERERERERERERERERERERERERERERERERERERERERERERERERERERERERERERERERERERERERERERERERERERERE=",
+        "client_nonce": "AQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQE=",
+        "node_public_key": "IiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiI=",
+        "node_nonce": "AgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgI="
+      },
+      "channel_binding": "qJyJucIuMOwG9P1W9M9Jx49O9aRpOdahTv8gXxh02l8="
+    },
+    {
+      "name": "node-key-swapped",
+      "input": {
+        "node_id": "node-data",
+        "client_public_key": "ERERERERERERERERERERERERERERERERERERERERERERERERERERERERERERERERERERERERERERERERERERERE=",
+        "client_nonce": "AQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQE=",
+        "node_public_key": "MzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzM=",
+        "node_nonce": "AgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgI="
+      },
+      "channel_binding": "nRvuWTYAgiaFvc7OGGYXqI8IGkHgZBFGNrBvGZ/ddV8="
+    },
+    {
+      "name": "client-nonce-changed",
+      "input": {
+        "node_id": "node-data",
+        "client_public_key": "ERERERERERERERERERERERERERERERERERERERERERERERERERERERERERERERERERERERERERERERERERERERE=",
+        "client_nonce": "BQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQU=",
+        "node_public_key": "IiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiI=",
+        "node_nonce": "AgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgI="
+      },
+      "channel_binding": "lYu0fhx9OZHbAn2aHKH3K7rQazX/hfb2rcSsCPMewJQ="
+    }
+  ]
+}
