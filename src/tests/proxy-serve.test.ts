@@ -4,6 +4,7 @@ import fs from "node:fs";
 import https from "node:https";
 import os from "node:os";
 import path from "node:path";
+import zlib from "node:zlib";
 
 import { serveProxyRequest, type SsrfCheck } from "../runtime/proxy-serve";
 import type { SafeResolution } from "../runtime/ssrf";
@@ -74,6 +75,7 @@ const server = Bun.serve({
         "x-payment-seen": req.headers.get("x-payment") ?? "ABSENT",
         "x-auth-seen": req.headers.get("authorization") ?? "ABSENT",
         "x-ct-seen": req.headers.get("content-type") ?? "ABSENT",
+        "x-ce-seen": req.headers.get("content-encoding") ?? "ABSENT",
       },
     });
   },
@@ -159,6 +161,27 @@ try {
     assert.equal(res.headers["x-auth-seen"], "Bearer upstream-token", "Authorization is preserved");
     assert.equal(res.headers["x-ct-seen"], "application/json", "Content-Type is preserved");
     checks += 7;
+  }
+
+  // 7) An already-encoded request body keeps its Content-Encoding. The node
+  // forwards the original body bytes verbatim, so stripping content-encoding
+  // would leave the upstream unable to decode them. Control headers on the same
+  // request are still stripped.
+  {
+    const gz = zlib.gzipSync(Buffer.from(JSON.stringify({ hello: "world" })));
+    const res = await serveProxyRequest(
+      {
+        target_url: `http://127.0.0.1:${port}/echo`,
+        method: "POST",
+        headers: { "content-encoding": "gzip", "content-type": "application/json", "x-api-key": "secret" },
+        body: gz,
+      },
+      { ssrfCheck: allow("127.0.0.1") },
+    );
+    assert.equal(res.status, 200);
+    assert.equal(res.headers["x-ce-seen"], "gzip", "Content-Encoding survives for an encoded body");
+    assert.equal(res.headers["x-apikey-seen"], "ABSENT", "control headers are still stripped");
+    checks += 3;
   }
 } finally {
   server.stop(true);

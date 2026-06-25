@@ -87,13 +87,17 @@ function buildHopByHopDenySet(headers: Record<string, string>): Set<string> {
 // caller's orchestrator scoping credential) from leaking upstream.
 //
 // Source of truth: STRIP_REQUEST_HEADERS in the consensus repo
-// (server/features/proxy/proxy.ts). Keep this list in sync with it. Some entries
-// (host, connection, transfer-encoding) overlap the hop-by-hop set and stay
-// handled there as well.
+// (server/features/proxy/proxy.ts). This mirrors that list with ONE deliberate
+// divergence: `content-encoding` is NOT stripped here. Unlike the orchestrator,
+// this path forwards the original request body bytes verbatim, so the
+// representation-encoding metadata must survive — drop it and the upstream gets
+// e.g. gzip bytes with no Content-Encoding and misreads or rejects them.
+// `content-length` IS still stripped because fetch recomputes it to match the
+// forwarded body. Some entries (host, connection, transfer-encoding) overlap the
+// hop-by-hop set and stay handled there as well.
 const CONSENSUS_CONTROL_HEADERS = new Set([
   "host",
   "content-length",
-  "content-encoding",
   "transfer-encoding",
   "connection",
   "x-idempotency-key",
