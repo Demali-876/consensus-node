@@ -79,6 +79,42 @@ function buildHopByHopDenySet(headers: Record<string, string>): Set<string> {
   return deny;
 }
 
+// Consensus-internal control headers that must never be forwarded to an upstream
+// target. On the direct data plane the client supplies the request headers and
+// the node serves them against the client's chosen upstream, so these are
+// stripped node-side as defense-in-depth — the orchestrator (relayed path) and
+// the consensus-client both strip them too. Notably this keeps `x-api-key` (the
+// caller's orchestrator scoping credential) from leaking upstream.
+//
+// Source of truth: STRIP_REQUEST_HEADERS in the consensus repo
+// (server/features/proxy/proxy.ts). This mirrors that list with ONE deliberate
+// divergence: `content-encoding` is NOT stripped here. Unlike the orchestrator,
+// this path forwards the original request body bytes verbatim, so the
+// representation-encoding metadata must survive — drop it and the upstream gets
+// e.g. gzip bytes with no Content-Encoding and misreads or rejects them.
+// `content-length` IS still stripped because fetch recomputes it to match the
+// forwarded body. Some entries (host, connection, transfer-encoding) overlap the
+// hop-by-hop set and stay handled there as well.
+const CONSENSUS_CONTROL_HEADERS = new Set([
+  "host",
+  "content-length",
+  "transfer-encoding",
+  "connection",
+  "x-idempotency-key",
+  "idempotency-key",
+  "x-payment",
+  "x-verbose",
+  "x-api-key",
+  "x-cache-ttl",
+  "x-direct",
+  "x-node-region",
+  "x-node-domain",
+  "x-node-exclude",
+  "x-forwarded-for",
+  "x-real-ip",
+  "forwarded",
+]);
+
 export async function serveProxyRequest(
   request: ProxyServeRequest,
   opts: ProxyServeOptions = {},
@@ -100,7 +136,9 @@ export async function serveProxyRequest(
   const deny = buildHopByHopDenySet(request.headers ?? {});
   const headers = new Headers();
   for (const [key, value] of Object.entries(request.headers ?? {})) {
-    if (!deny.has(key.toLowerCase())) headers.set(key, value);
+    const lower = key.toLowerCase();
+    if (deny.has(lower) || CONSENSUS_CONTROL_HEADERS.has(lower)) continue;
+    headers.set(key, value);
   }
   headers.set("host", originalHost);
   if (!headers.has("user-agent")) headers.set("user-agent", "Consensus-Node/0.1");

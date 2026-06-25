@@ -4,6 +4,7 @@ import fs from "node:fs";
 import https from "node:https";
 import os from "node:os";
 import path from "node:path";
+import zlib from "node:zlib";
 
 import { serveProxyRequest, type SsrfCheck } from "../runtime/proxy-serve";
 import type { SafeResolution } from "../runtime/ssrf";
@@ -66,6 +67,15 @@ const server = Bun.serve({
         "x-host-seen": req.headers.get("host") ?? "ABSENT",
         "x-secret-seen": req.headers.get("x-secret") ?? "ABSENT",
         "x-keep-seen": req.headers.get("x-keep") ?? "ABSENT",
+        // Reflections for the consensus control-header stripping assertions.
+        "x-apikey-seen": req.headers.get("x-api-key") ?? "ABSENT",
+        "x-cachettl-seen": req.headers.get("x-cache-ttl") ?? "ABSENT",
+        "x-noderegion-seen": req.headers.get("x-node-region") ?? "ABSENT",
+        "x-fwd-seen": req.headers.get("x-forwarded-for") ?? "ABSENT",
+        "x-payment-seen": req.headers.get("x-payment") ?? "ABSENT",
+        "x-auth-seen": req.headers.get("authorization") ?? "ABSENT",
+        "x-ct-seen": req.headers.get("content-type") ?? "ABSENT",
+        "x-ce-seen": req.headers.get("content-encoding") ?? "ABSENT",
       },
     });
   },
@@ -120,6 +130,59 @@ try {
     assert.equal(res.headers["x-keep-seen"], "ok", "ordinary header is forwarded");
     checks += 2;
   }
+
+  // 6) Consensus control headers are stripped before reaching the upstream
+  // (defense-in-depth vs. a client that doesn't strip them — mirrors the
+  // orchestrator's STRIP_REQUEST_HEADERS). Ordinary headers like Authorization
+  // and Content-Type still reach the upstream untouched.
+  {
+    const res = await serveProxyRequest(
+      {
+        target_url: `http://127.0.0.1:${port}/echo`,
+        method: "POST",
+        headers: {
+          "x-api-key": "orchestrator-secret",
+          "x-cache-ttl": "60",
+          "x-node-region": "us-east",
+          "x-forwarded-for": "1.2.3.4",
+          "x-payment": "tok_123",
+          authorization: "Bearer upstream-token",
+          "content-type": "application/json",
+        },
+        body: "{}",
+      },
+      { ssrfCheck: allow("127.0.0.1") },
+    );
+    assert.equal(res.headers["x-apikey-seen"], "ABSENT", "x-api-key must not reach the upstream");
+    assert.equal(res.headers["x-cachettl-seen"], "ABSENT", "x-cache-ttl must not reach the upstream");
+    assert.equal(res.headers["x-noderegion-seen"], "ABSENT", "x-node-region must not reach the upstream");
+    assert.equal(res.headers["x-fwd-seen"], "ABSENT", "x-forwarded-for must not reach the upstream");
+    assert.equal(res.headers["x-payment-seen"], "ABSENT", "x-payment must not reach the upstream");
+    assert.equal(res.headers["x-auth-seen"], "Bearer upstream-token", "Authorization is preserved");
+    assert.equal(res.headers["x-ct-seen"], "application/json", "Content-Type is preserved");
+    checks += 7;
+  }
+
+  // 7) An already-encoded request body keeps its Content-Encoding. The node
+  // forwards the original body bytes verbatim, so stripping content-encoding
+  // would leave the upstream unable to decode them. Control headers on the same
+  // request are still stripped.
+  {
+    const gz = zlib.gzipSync(Buffer.from(JSON.stringify({ hello: "world" })));
+    const res = await serveProxyRequest(
+      {
+        target_url: `http://127.0.0.1:${port}/echo`,
+        method: "POST",
+        headers: { "content-encoding": "gzip", "content-type": "application/json", "x-api-key": "secret" },
+        body: gz,
+      },
+      { ssrfCheck: allow("127.0.0.1") },
+    );
+    assert.equal(res.status, 200);
+    assert.equal(res.headers["x-ce-seen"], "gzip", "Content-Encoding survives for an encoded body");
+    assert.equal(res.headers["x-apikey-seen"], "ABSENT", "control headers are still stripped");
+    checks += 3;
+  }
 } finally {
   server.stop(true);
 }
@@ -170,4 +233,4 @@ if (tlsCert) {
   console.log("proxy-serve.test.ts: openssl unavailable — skipped HTTPS identity assertions");
 }
 
-console.log(`proxy-serve.test.ts: ${checks} checks passed — SSRF-gated, IP-pinned serve; HTTPS validated vs hostname; hop-by-hop stripped`);
+console.log(`proxy-serve.test.ts: ${checks} checks passed — SSRF-gated, IP-pinned serve; HTTPS validated vs hostname; hop-by-hop + consensus control headers stripped`);
