@@ -17,7 +17,9 @@ module.exports = {
   apps: [
     {
       name: appName,
-      script: path.join(currentDir, "scripts", "run-control.sh"),
+      // run-node.sh runs the runtime server (inbound /connect) AND the control
+      // tunnel as one unit. (run-control.sh, control-only, is kept for reference.)
+      script: path.join(currentDir, "scripts", "run-node.sh"),
       interpreter: "/bin/bash",
       cwd: currentDir,
       instances: 1,

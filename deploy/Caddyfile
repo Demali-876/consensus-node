@@ -1,0 +1,14 @@
+# Reference template for a Consensus node's public TLS endpoint.
+#
+# scripts/setup-node-tls.sh renders a concrete copy of this from the node's
+# registered domain (state/config.json) and installs it to /etc/caddy/Caddyfile.
+# You can also use this file directly by exporting NODE_DOMAIN (and optionally
+# NODE_PORT) and pointing Caddy at it — Caddy substitutes {$VAR} from the env.
+#
+# Caddy obtains and auto-renews a Let's Encrypt cert for the domain (HTTP-01 needs
+# :80 reachable; otherwise it falls back to TLS-ALPN-01 over :443) and proxies the
+# /connect WebSocket upgrade transparently to the runtime server.
+
+{$NODE_DOMAIN} {
+	reverse_proxy localhost:{$NODE_PORT:9090}
+}

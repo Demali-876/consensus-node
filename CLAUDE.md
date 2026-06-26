@@ -12,11 +12,11 @@ Verifiable Bun worker node runtime for the Consensus network. Written from scrat
 
 Each top-level lifecycle phase has its own entry file under `src/` and a matching `bun run` script:
 
-- `bun run start` — local Fastify API on `:9090` (`src/instance.ts`).
+- `bun run start` — runtime server on `:9090` (`src/instance.ts`); hosts the inbound `/connect` data-plane endpoint. In production it runs alongside the control tunnel as one unit (`scripts/run-node.sh`), fronted by Caddy for wss/TLS — see `deploy/README.md`.
 - `bun run setup` — interactive join wizard (recommended path; orchestrates eval → register → verify).
 - `bun run eval` — encrypted eval over the tunnel; passing eval writes `join-auth.json` into the state dir.
 - `bun run register` — submit join payload (requires `join-auth.json` from a prior eval).
-- `bun run control` — long-lived encrypted control tunnel with exponential reconnect; **this is the production foreground process** (PM2 runs it via `scripts/run-control.sh`).
+- `bun run control` — long-lived encrypted control tunnel with exponential reconnect. In production it runs **together with the runtime server** under one supervised unit (`scripts/run-node.sh`, which the PM2/systemd/launchd configs exec). `scripts/run-control.sh` (control-only) is kept for reference but no longer serves `/connect`.
 - `bun run verify` — server-side check that the registered node key signs the local manifest.
 - `bun run update` / `bun run update -- --download` — compare local manifest to server `/update/latest`; optional verified download.
 - `bun run release -- --version X --commit … --platform … --download-url …` — produce tarball + admin manifest in `dist/`.
@@ -91,7 +91,7 @@ Hosted by `runtime/server.ts` (Fastify + `@fastify/websocket`) and the same eval
 `src/release.ts` builds a tarball, signs a `ReleaseManifest` (`src/types.ts`), and emits an `/admin/manifest` payload that the Consensus server consumes to gate updates. GitHub Actions' `Release` workflow is manual.
 
 In production:
-- `ecosystem.config.cjs` configures PM2 to run `<install-dir>/current/scripts/run-control.sh` (which itself execs `bun run control`).
+- `ecosystem.config.cjs` configures PM2 to run `<install-dir>/current/scripts/run-node.sh`, which runs the runtime server (`bun run start`, inbound `/connect`) and the control tunnel (`bun run control`) as one unit and exits if either does, so an `update_apply` (or a crash) restarts both from the refreshed `current`. Caddy (`deploy/`) terminates wss/TLS in front of the runtime server. The `systemd/` and `launchd/` units exec the same script.
 - `scripts/install-release.sh` is the default installer: unpacks the verified tarball into `releases/<version>/`, installs prod deps with the lockfile, atomically moves the `current` symlink, then prunes old releases per `CONSENSUS_NODE_RELEASE_RETENTION` (default 3) — while protecting the release that is mid-update.
 - `scripts/ensure-pm2.sh` and `scripts/start-pm2.sh` bootstrap PM2 on macOS (Homebrew → Node → PM2). `launchd/` and `systemd/` templates exist for non-PM2 deployments.
 
