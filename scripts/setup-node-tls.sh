@@ -15,7 +15,16 @@
 #
 set -euo pipefail
 
-state_dir="${CONSENSUS_STATE_DIR:-"$HOME/.consensus/node"}"
+# Resolve the state dir. Under `sudo`, $HOME is root's, but `bun run setup` created the
+# node state under the INVOKING user's home — honor $SUDO_USER so the default finds the
+# right config.json (override explicitly with CONSENSUS_STATE_DIR).
+if [[ -n "${CONSENSUS_STATE_DIR:-}" ]]; then
+  state_dir="${CONSENSUS_STATE_DIR}"
+elif [[ -n "${SUDO_USER:-}" && "${SUDO_USER}" != "root" ]]; then
+  state_dir="$(eval echo "~${SUDO_USER}")/.consensus/node"
+else
+  state_dir="${HOME}/.consensus/node"
+fi
 config="${state_dir}/config.json"
 node_port="${NODE_PORT:-9090}"
 caddyfile="${CADDYFILE:-/etc/caddy/Caddyfile}"
@@ -29,8 +38,9 @@ command -v caddy >/dev/null 2>&1 || {
   exit 1
 }
 
-# Read the assigned domain straight from the node config (bun is always present).
-domain="$(bun -e 'try{const c=require("fs").readFileSync(process.argv[1],"utf8");process.stdout.write(String(JSON.parse(c).domain||""))}catch{process.exit(1)}' "${config}" || true)"
+# Read the assigned domain from config.json WITHOUT depending on bun being on the
+# (sudo-reset) PATH. Hostnames contain no JSON-escaped characters, so this is safe.
+domain="$(sed -nE 's/.*"domain"[[:space:]]*:[[:space:]]*"([^"]+)".*/\1/p' "${config}" | head -n1)"
 if [[ -z "${domain}" || "${domain}" == "null" ]]; then
   echo "no domain in ${config} — register the node first (bun run setup)" >&2
   exit 1

@@ -33,7 +33,9 @@ Cloudflare credentials.
 bun run setup
 
 # 2. Provision TLS for the assigned domain → runtime server.
-sudo CADDYFILE=/etc/caddy/Caddyfile scripts/setup-node-tls.sh
+#    (Run under sudo to write /etc/caddy/Caddyfile + reload caddy; it resolves the
+#    invoking user's node state via $SUDO_USER. Set CONSENSUS_STATE_DIR if non-default.)
+sudo scripts/setup-node-tls.sh
 
 # 3. Run the node unit (runtime server + control) under your supervisor:
 pm2 start ecosystem.config.cjs           # PM2
