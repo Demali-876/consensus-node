@@ -10,7 +10,7 @@
   <array>
     <string>/bin/zsh</string>
     <string>-lc</string>
-    <string>${HOME}/.consensus/node-runtime/current/scripts/run-control.sh</string>
+    <string>${HOME}/.consensus/node-runtime/current/scripts/run-node.sh</string>
   </array>
 
   <key>EnvironmentVariables</key>
