@@ -12,11 +12,11 @@ Verifiable Bun worker node runtime for the Consensus network. Written from scrat
 
 Each top-level lifecycle phase has its own entry file under `src/` and a matching `bun run` script:
 
-- `bun run start` — runtime server on `:9090` (`src/instance.ts`); hosts the inbound `/connect` data-plane endpoint. In production it runs alongside the control tunnel as one unit (`scripts/run-node.sh`), fronted by Caddy for wss/TLS — see `deploy/README.md`.
+- `bun run start` — runtime server (`src/instance.ts`), **loopback-only by default** (`NODE_HOST=127.0.0.1`, port `:9090`); serves local operator endpoints (`/health`, `/node/*`) plus a now-dormant `/connect` route. In production it runs alongside the control tunnel as one unit (`scripts/run-node.sh`). The client-facing data plane rides the **control tunnel** via the orchestrator node-gateway, so the node opens no inbound port and terminates no TLS — see `deploy/README.md`.
 - `bun run setup` — interactive join wizard (recommended path; orchestrates eval → register → verify).
 - `bun run eval` — encrypted eval over the tunnel; passing eval writes `join-auth.json` into the state dir.
 - `bun run register` — submit join payload (requires `join-auth.json` from a prior eval).
-- `bun run control` — long-lived encrypted control tunnel with exponential reconnect. In production it runs **together with the runtime server** under one supervised unit (`scripts/run-node.sh`, which the PM2/systemd/launchd configs exec). `scripts/run-control.sh` (control-only) is kept for reference but no longer serves `/connect`.
+- `bun run control` — long-lived encrypted control tunnel with exponential reconnect. This is the node's whole data path: heartbeats, proxy work, **and** the client-facing data plane, which the orchestrator node-gateway bridges onto its streams (`{kind:"data-plane"}` → `serveDataConnection`, via `src/clients/data-plane-stream.ts`). In production it runs **together with the runtime server** under one supervised unit (`scripts/run-node.sh`, which the PM2/systemd/launchd configs exec). `scripts/run-control.sh` (control-only) is kept for reference.
 - `bun run verify` — server-side check that the registered node key signs the local manifest.
 - `bun run update` / `bun run update -- --download` — compare local manifest to server `/update/latest`; optional verified download.
 - `bun run release -- --version X --commit … --platform … --download-url …` — produce tarball + admin manifest in `dist/`.
@@ -65,7 +65,7 @@ When working with tunnel logic, prefer extending `MESSAGE_TYPE` and the `TunnelM
 `eval-client.ts` and `control-client.ts` are thin wrappers over `connectEncryptedTunnel` that own per-mode state machines:
 
 - **Eval client** opens an eval tunnel, runs benchmark/integrity actions on demand from the server, and writes `join-auth.json` when the server emits `JOIN_READY`. Eval consumes the encrypted authorization; it does not require port-forwarding or a public benchmark endpoint.
-- **Control client** is the production long-running loop. It sends heartbeats, executes `proxy_request` and `stream_*` messages, multiplexes a "public tunnel" frame format (5-byte type+stream_id header) across server-driven streams, and owns the `update_prepare` → `update_ready` → `update_apply` flow. On apply it closes the WS with code `1012`, then exits with code `0` so the supervisor restarts via the `current` symlink.
+- **Control client** is the production long-running loop. It sends heartbeats, executes `proxy_request` and `stream_*` messages, multiplexes a "public tunnel" frame format (5-byte type+stream_id header) across server-driven streams, serves the client-facing **data plane** when the orchestrator opens a `{kind:"data-plane"}` stream (`src/clients/data-plane-stream.ts` adapts the tunnel stream to `serveDataConnection`), and owns the `update_prepare` → `update_ready` → `update_apply` flow. On apply it closes the WS with code `1012`, then exits with code `0` so the supervisor restarts via the `current` symlink.
 
 `src/control.ts` wraps `startControlClient` in an exponential-backoff reconnect loop (capped at ~30 s + jitter); do not move retry logic into the client itself.
 
@@ -91,7 +91,7 @@ Hosted by `runtime/server.ts` (Fastify + `@fastify/websocket`) and the same eval
 `src/release.ts` builds a tarball, signs a `ReleaseManifest` (`src/types.ts`), and emits an `/admin/manifest` payload that the Consensus server consumes to gate updates. GitHub Actions' `Release` workflow is manual.
 
 In production:
-- `ecosystem.config.cjs` configures PM2 to run `<install-dir>/current/scripts/run-node.sh`, which runs the runtime server (`bun run start`, inbound `/connect`) and the control tunnel (`bun run control`) as one unit and exits if either does, so an `update_apply` (or a crash) restarts both from the refreshed `current`. Caddy (`deploy/`) terminates wss/TLS in front of the runtime server. The `systemd/` and `launchd/` units exec the same script.
+- `ecosystem.config.cjs` configures PM2 to run `<install-dir>/current/scripts/run-node.sh`, which runs the control tunnel (`bun run control`, the data path) and a loopback-only runtime server (`bun run start`) as one unit and exits if either does, so an `update_apply` (or a crash) restarts both from the refreshed `current`. The client-facing data plane is bridged onto the control tunnel by the orchestrator node-gateway, so the node opens no inbound port and terminates no TLS. The `systemd/` and `launchd/` units exec the same script.
 - `scripts/install-release.sh` is the default installer: unpacks the verified tarball into `releases/<version>/`, installs prod deps with the lockfile, atomically moves the `current` symlink, then prunes old releases per `CONSENSUS_NODE_RELEASE_RETENTION` (default 3) — while protecting the release that is mid-update.
 - `scripts/ensure-pm2.sh` and `scripts/start-pm2.sh` bootstrap PM2 on macOS (Homebrew → Node → PM2). `launchd/` and `systemd/` templates exist for non-PM2 deployments.
 

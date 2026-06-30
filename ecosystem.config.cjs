@@ -39,8 +39,9 @@ module.exports = {
   apps: [
     {
       name: appName,
-      // run-node.sh runs the runtime server (inbound /connect) AND the control
-      // tunnel as one unit. (run-control.sh, control-only, is kept for reference.)
+      // run-node.sh runs the outbound control tunnel (which carries the data
+      // plane via the orchestrator gateway) AND a loopback-only runtime server as
+      // one unit. (run-control.sh, control-only, is kept for reference.)
       script: path.join(currentDir, "scripts", "run-node.sh"),
       interpreter: bashInterpreter,
       cwd: currentDir,

@@ -1,12 +1,15 @@
 #!/usr/bin/env bash
 #
-# Supervised node unit — runs BOTH the runtime server (the inbound /connect
-# data-plane endpoint on :NODE_PORT) and the outbound control tunnel as one unit.
+# Supervised node unit — runs BOTH the control tunnel and the runtime server as
+# one unit.
 #
-# Background: the direct data plane needs the runtime server reachable, but the
-# production supervisor historically ran only the control tunnel (run-control.sh),
-# so /connect was never served. Running both here means a single PM2/systemd unit
-# covers both, and one restart refreshes both from the updated `current` symlink.
+# The control tunnel (`bun run control`) is the whole data path: it carries
+# heartbeats, proxy work, AND the client-facing data plane, which the orchestrator
+# node-gateway bridges onto it (target {kind:"data-plane"} streams). The runtime
+# server (`bun run start`) binds loopback-only and just serves local operator
+# endpoints (/health, /node/*); it needs no inbound port or TLS. Running both under
+# one PM2/systemd unit means a single restart refreshes both from the updated
+# `current` symlink.
 #
 # The unit exits as soon as EITHER child exits: the control tunnel exits on
 # `update_apply` (so the whole unit restarts onto the new release), and a crash of
@@ -39,7 +42,7 @@ fi
 
 cd "${current}"
 
-# Inbound: runtime server hosting /connect. Outbound: control tunnel.
+# Loopback runtime server (operator endpoints) + outbound control tunnel (data path).
 bun run start   & runtime_pid=$!
 bun run control & control_pid=$!
 
