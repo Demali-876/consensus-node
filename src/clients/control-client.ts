@@ -13,6 +13,9 @@ import { executeProxySessionMessage } from "../runtime/proxy-session";
 import { connectEncryptedTunnel } from "../tunnel/connect";
 import { MESSAGE_TYPE, TUNNEL_MODE, createErrorMessage, nowSeconds } from "../tunnel/messages";
 import { compareManifests, downloadAndVerify } from "../update";
+import { JtiReplayCache } from "../tickets/replay";
+import { loadPinnedOrchestratorKey } from "../tickets/orchestrator-key";
+import { startDataPlaneStream, type DataPlaneStream } from "./data-plane-stream";
 
 const PUBLIC_TUNNEL_FRAME = {
   STREAM_OPEN:  0x01,
@@ -85,6 +88,9 @@ export async function startControlClient(options: ControlClientOptions) {
     serverToOwner: Map<string, number>;
   }>();
   const publicTunnelStreams = new Map<string, { tunnelId: string; ownerStreamId: number }>();
+  const dataPlaneStreams = new Map<string, DataPlaneStream>();
+  // jti replay cache shared across every data-plane session in this process.
+  const dataPlaneReplay = new JtiReplayCache();
   let preparedUpdate: {
     updateId: string;
     manifest: ReleaseManifest;
@@ -121,9 +127,13 @@ export async function startControlClient(options: ControlClientOptions) {
       code: event.code ?? null,
       reason: event.reason ?? event.error.message,
     });
+    for (const stream of dataPlaneStreams.values()) {
+      stream.fail(new Error("connection closed"));
+    }
     rawStreams.clear();
     publicTunnelOwners.clear();
     publicTunnelStreams.clear();
+    dataPlaneStreams.clear();
     activeStreams.clear();
     resolveClosed(event);
   });
@@ -254,6 +264,44 @@ export async function startControlClient(options: ControlClientOptions) {
           owner.streamId,
           encodePublicTunnelFrame(PUBLIC_TUNNEL_FRAME.STREAM_OPEN, ownerStreamId, target.initialData),
         );
+        return;
+      }
+
+      if (target?.kind === "data-plane") {
+        const streamId = message.stream_id;
+        activeStreams.add(streamId);
+        log.info("control-client", "data-plane-stream-open", {
+          node_id: nodeId,
+          session_id: connected.sessionId,
+          stream_id: streamId,
+        });
+        const stream = startDataPlaneStream({
+          resolveDeps: async () => {
+            const pinned = await loadPinnedOrchestratorKey();
+            if (!pinned) throw new Error("no pinned orchestrator key");
+            return { nodeId, identity, pinnedKey: pinned.key, replay: dataPlaneReplay };
+          },
+          sendData: (data) => sendStreamData(streamId, data),
+          sendClose: (reason) => sendStreamClose(streamId, reason),
+          onError: (error) => {
+            log.warn("control-client", "data-plane-stream-failed", {
+              node_id: nodeId,
+              session_id: connected.sessionId,
+              stream_id: streamId,
+              message: error.message,
+            });
+          },
+          onDone: () => {
+            dataPlaneStreams.delete(streamId);
+            activeStreams.delete(streamId);
+            log.info("control-client", "data-plane-stream-closed", {
+              node_id: nodeId,
+              session_id: connected.sessionId,
+              stream_id: streamId,
+            });
+          },
+        });
+        dataPlaneStreams.set(streamId, stream);
         return;
       }
 
@@ -399,6 +447,12 @@ export async function startControlClient(options: ControlClientOptions) {
         return;
       }
 
+      const dataPlaneStream = dataPlaneStreams.get(message.stream_id);
+      if (dataPlaneStream) {
+        dataPlaneStream.push(Buffer.from(message.data, "base64"));
+        return;
+      }
+
       activeRequests += 1;
       try {
         const output = await executeProxySessionMessage(Buffer.from(message.data, "base64"));
@@ -457,6 +511,14 @@ export async function startControlClient(options: ControlClientOptions) {
           ).catch(() => undefined);
         }
         cleanupPublicTunnelStream(message.stream_id);
+        return;
+      }
+
+      const dataPlaneStream = dataPlaneStreams.get(message.stream_id);
+      if (dataPlaneStream) {
+        dataPlaneStreams.delete(message.stream_id);
+        activeStreams.delete(message.stream_id);
+        dataPlaneStream.fail(new Error("client stream closed"));
         return;
       }
 
@@ -693,7 +755,8 @@ function sleep(ms: number): Promise<void> {
 type StreamTarget =
   | { kind: "raw-tunnel"; host: string; port: number }
   | { kind: "public-tunnel-owner"; tunnelId: string }
-  | { kind: "public-tunnel-stream"; tunnelId: string; initialData: Buffer };
+  | { kind: "public-tunnel-stream"; tunnelId: string; initialData: Buffer }
+  | { kind: "data-plane" };
 
 function parseStreamTarget(value: string | undefined): StreamTarget | null {
   if (!value) return null;
@@ -723,6 +786,9 @@ function parseStreamTarget(value: string | undefined): StreamTarget | null {
         tunnelId: parsed.tunnel_id,
         initialData: parsed.initial_data ? Buffer.from(parsed.initial_data, "base64") : Buffer.alloc(0),
       };
+    }
+    if (parsed.kind === "data-plane") {
+      return { kind: "data-plane" };
     }
     return null;
   } catch {
