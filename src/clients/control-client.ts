@@ -44,6 +44,14 @@ function decodePublicTunnelFrame(data: Buffer): { type: PublicTunnelFrameType; s
   };
 }
 
+// Process-global jti replay cache for the data plane. It MUST outlive individual
+// control connections: src/control.ts recreates the control client on every
+// reconnect, so a per-client cache would forget already-spent ticket jtis across a
+// transient disconnect and let a still-valid ticket be replayed on the new
+// connection. The cache self-prunes by ticket expiry, so a long-lived process
+// stays bounded. (Mirrors runtime/data-route.ts's per-process replay cache.)
+const dataPlaneReplay = new JtiReplayCache();
+
 export interface ControlClientOptions {
   gatewayUrl: string;
   nodeId?: string;
@@ -89,8 +97,6 @@ export async function startControlClient(options: ControlClientOptions) {
   }>();
   const publicTunnelStreams = new Map<string, { tunnelId: string; ownerStreamId: number }>();
   const dataPlaneStreams = new Map<string, DataPlaneStream>();
-  // jti replay cache shared across every data-plane session in this process.
-  const dataPlaneReplay = new JtiReplayCache();
   let preparedUpdate: {
     updateId: string;
     manifest: ReleaseManifest;
