@@ -152,6 +152,11 @@ async function main(): Promise<void> {
     say("  multi-core scaling across workers...");
     multiCore = await runMultiCore();
 
+    // Let worker teardown settle before the drift check, so a transient from
+    // terminating N workers is not misread as background contention. A machine
+    // that is genuinely busy will still show elevated p99 after this.
+    await new Promise((resolve) => setTimeout(resolve, 250));
+    Bun.gc(true);
     post = await runEventLoop();
     if (post.ns_per_op.p99 > baseline.ns_per_op.p99 * DRIFT_FACTOR_WARN) {
       warnings.push(
@@ -224,10 +229,10 @@ function printSummary(report: CpuBenchReport): void {
 
   const multiCore = report.character.multi_core;
   if (multiCore) {
-    console.log(`\n  ── multi-core scaling (sha256 chains, ${multiCore.cores} advertised cores) ──`);
+    console.log(`\n  ── multi-core scaling (int-mix chains, ${multiCore.cores} advertised cores) ──`);
     for (const point of multiCore.points) {
       console.log(
-        `  ${String(point.workers).padStart(3)} workers  ${fmtOps(point.total_ops_per_second).padStart(10)} h/s total   efficiency ${(point.efficiency * 100).toFixed(0)}%`,
+        `  ${String(point.workers).padStart(3)} workers  ${fmtOps(point.total_ops_per_second).padStart(10)} ops/s total   efficiency ${(point.efficiency * 100).toFixed(0)}%`,
       );
     }
     console.log(`  effective cores: ~${multiCore.effective_cores} of ${multiCore.cores} advertised`);

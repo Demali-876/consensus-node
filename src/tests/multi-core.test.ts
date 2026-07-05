@@ -19,7 +19,7 @@ assert.deepEqual(defaultPoints(14), [1, 2, 4, 8, 14], "core count appended when 
 const result = await runMultiCore({ durationMs: 250, points: [1, 2] });
 
 assert.equal(result.points.length, 2, "one point per requested worker count");
-assert.equal(result.chain, "sha256", "chain identifies the workload");
+assert.equal(result.chain, "int-mix", "chain identifies the allocation-free workload");
 assert.ok(result.cores >= 1, "core count reported");
 
 const [one, two] = result.points;

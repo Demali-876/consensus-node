@@ -1,7 +1,8 @@
-// Multi-core scaling: K workers each run an independent sequential SHA-256
+// Multi-core scaling: K workers each run an independent sequential integer-mix
 // chain (see multi-core.worker.ts) for the same wall window; summing their
 // self-timed rates shows how much total CPU the machine really gives this
-// process as concurrency rises.
+// process as concurrency rises. The kernel is allocation-free on purpose — a
+// crypto-hash kernel measures allocator/GC contention, not core scaling.
 //
 // What the curve tells you:
 //   - efficiency ~1.0 up to N     → N real, unshared cores
@@ -39,7 +40,7 @@ export interface MultiCorePoint {
 
 export interface MultiCoreResult {
   cores: number;
-  chain: "sha256";
+  chain: "int-mix";
   points: MultiCorePoint[];
   single_ops_per_second: number;
   /** total@maxK / per-worker@1 — how many cores' worth of work you actually get. */
@@ -76,7 +77,7 @@ export async function runMultiCore(opts: MultiCoreOptions = {}): Promise<MultiCo
   const last = measured[measured.length - 1];
   return {
     cores,
-    chain: "sha256",
+    chain: "int-mix",
     points: measured,
     single_ops_per_second: Math.round(singleRate),
     effective_cores:
