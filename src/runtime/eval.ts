@@ -1,6 +1,9 @@
 import { capabilitiesRecord } from "./capabilities";
 import { integrityPayload } from "../node/integrity";
 import { runCpuHash, runCryptoAead, runEventLoop, runMemory, runSystem } from "./benchmarks/index";
+import { runCompositeRequest } from "./benchmarks/suites/composite-request";
+import { runSustained } from "./benchmarks/suites/sustained";
+import { runMultiCore } from "./benchmarks/suites/multi-core";
 import { runSpeedtestFetch, runTunnelEcho } from "./network-eval";
 import type { EvalAction } from "../tunnel/messages";
 
@@ -15,6 +18,21 @@ export async function runEvalAction(action: EvalAction, _params: Record<string, 
   if (action === "benchmark_memory") return runMemory();
   if (action === "benchmark_event_loop") return runEventLoop();
   if (action === "benchmark_memory_pressure") return runLegacyMemoryPressure(_params);
+  // Admission suites. The server drives these and gates on their results; params
+  // let it tune the sustained window (see evalActionTimeout on the server). All
+  // three run node-side-timed via the real production pipeline — see the suites.
+  if (action === "benchmark_composite") {
+    return runCompositeRequest(_params.quick ? { warmupMs: 50, measureMs: 300 } : {});
+  }
+  if (action === "benchmark_sustained") {
+    return runSustained({
+      durationMs: positiveNumber(_params.duration_ms),
+      windowMs: positiveNumber(_params.window_ms),
+    });
+  }
+  if (action === "benchmark_multicore") {
+    return runMultiCore({ durationMs: positiveNumber(_params.duration_ms) });
+  }
   if (action === "tunnel_echo") return runTunnelEcho(_params);
   if (action === "speedtest_fetch") return runSpeedtestFetch(_params);
   throw new Error(`Unsupported eval action: ${action satisfies never}`);
@@ -53,6 +71,13 @@ function clampInt(value: unknown, fallback: number, min: number, max: number): n
   const parsed = Number(value ?? fallback);
   if (!Number.isFinite(parsed)) return fallback;
   return Math.max(min, Math.min(max, Math.floor(parsed)));
+}
+
+// Server-supplied duration/window overrides for the admission suites. Returns
+// undefined for absent/invalid input so the suite falls back to its own default.
+function positiveNumber(value: unknown): number | undefined {
+  const parsed = Number(value);
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : undefined;
 }
 
 function bytesToMb(value: number): number {
