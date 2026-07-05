@@ -1,6 +1,7 @@
 import { capabilitiesRecord } from "./capabilities";
 import { integrityPayload } from "../node/integrity";
 import { runCpuHash, runCryptoAead, runEventLoop, runMemory, runSystem } from "./benchmarks/index";
+import { runSpeedtestFetch, runTunnelEcho } from "./network-eval";
 import type { EvalAction } from "../tunnel/messages";
 
 // `_params` is reserved for future per-action tuning; the auto-tuning runner does
@@ -14,6 +15,8 @@ export async function runEvalAction(action: EvalAction, _params: Record<string, 
   if (action === "benchmark_memory") return runMemory();
   if (action === "benchmark_event_loop") return runEventLoop();
   if (action === "benchmark_memory_pressure") return runLegacyMemoryPressure(_params);
+  if (action === "tunnel_echo") return runTunnelEcho(_params);
+  if (action === "speedtest_fetch") return runSpeedtestFetch(_params);
   throw new Error(`Unsupported eval action: ${action satisfies never}`);
 }
 
