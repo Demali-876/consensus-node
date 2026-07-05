@@ -36,11 +36,17 @@ import { hrtime } from "node:process";
 import {
   runCpuHash,
   runCryptoAead,
+  runEd25519,
+  runEncode,
   runEventLoop,
+  runSessionDerive,
   runSystem,
   type CpuHashResult,
   type CryptoAeadResult,
+  type Ed25519Result,
+  type EncodeResult,
   type EventLoopResult,
+  type SessionDeriveResult,
   type SystemResult,
 } from "./runtime/benchmarks/index";
 import {
@@ -95,7 +101,13 @@ interface CpuBenchReport {
   system: SystemResult;
   event_loop: { baseline: EventLoopResult; post: EventLoopResult | null };
   composite: CompositeRequestResult;
-  primitives: { cpu_hash: CpuHashResult | null; crypto_aead: CryptoAeadResult | null };
+  primitives: {
+    cpu_hash: CpuHashResult | null;
+    crypto_aead: CryptoAeadResult | null;
+    ed25519: Ed25519Result | null;
+    session_derive: SessionDeriveResult | null;
+    encode: EncodeResult | null;
+  };
   character: { sustained: SustainedResult | null; multi_core: MultiCoreResult | null };
   /** PRIMARY: admit + rank on this. */
   admission: AdmissionMetric;
@@ -209,14 +221,23 @@ async function main(): Promise<void> {
 
   let cpuHash: CpuHashResult | null = null;
   let cryptoAead: CryptoAeadResult | null = null;
+  let ed25519: Ed25519Result | null = null;
+  let sessionDerive: SessionDeriveResult | null = null;
+  let encode: EncodeResult | null = null;
   let sustained: SustainedResult | null = null;
   let multiCore: MultiCoreResult | null = null;
   let post: EventLoopResult | null = null;
 
   if (!quick) {
-    say("  primitives sha256 + chacha20-poly1305 diagnostics...");
+    // Per-primitive diagnostics that decompose the composite stages: ed25519
+    // (handshake sign + ticket verify), session-derive (handshake ECDH+HKDF),
+    // aead (response seal), encode (response encode), sha256 (dedupe hashing).
+    say("  primitives sha256 / chacha20 / ed25519 / session-derive / encode...");
     cpuHash = await runCpuHash();
     cryptoAead = await runCryptoAead();
+    ed25519 = await runEd25519();
+    sessionDerive = await runSessionDerive();
+    encode = await runEncode();
 
     if (sustainedSeconds > 0) {
       say(`  sustained  ${sustainedSeconds}s of continuous load @16KB (the admission metric)...`);
@@ -273,7 +294,7 @@ async function main(): Promise<void> {
     system,
     event_loop: { baseline, post },
     composite,
-    primitives: { cpu_hash: cpuHash, crypto_aead: cryptoAead },
+    primitives: { cpu_hash: cpuHash, crypto_aead: cryptoAead, ed25519, session_derive: sessionDerive, encode },
     character: { sustained, multi_core: multiCore },
     admission,
     secondary: {
@@ -336,10 +357,17 @@ function printSummary(report: CpuBenchReport): void {
     console.log(`  effective cores: ~${multiCore.effective_cores} of ${multiCore.cores} advertised`);
   }
 
-  if (report.primitives.cpu_hash && report.primitives.crypto_aead) {
-    console.log("\n  ── primitives (diagnostics) ──");
-    console.log(`  sha256 @1KB          ${mbps(report.primitives.cpu_hash.bytes_per_second)}`);
-    console.log(`  chacha20-poly1305    ${mbps(report.primitives.crypto_aead.total_bytes_per_second)} round-trip @1KB`);
+  const prim = report.primitives;
+  if (prim.cpu_hash || prim.crypto_aead || prim.ed25519 || prim.session_derive || prim.encode) {
+    console.log("\n  ── primitives (diagnostics: what drives each stage) ──");
+    if (prim.session_derive) console.log(`  session derive       ${fmtOps(prim.session_derive.derivations_per_second).padStart(8)} /s   (P-256 ecdh+hkdf → handshake)`);
+    if (prim.ed25519) {
+      console.log(`  ed25519 sign         ${fmtOps(prim.ed25519.sign_per_second).padStart(8)} /s   (→ handshake)`);
+      console.log(`  ed25519 verify       ${fmtOps(prim.ed25519.verify_per_second).padStart(8)} /s   (→ ticket verify)`);
+    }
+    if (prim.crypto_aead) console.log(`  chacha20-poly1305    ${mbps(prim.crypto_aead.total_bytes_per_second).padStart(8)}      round-trip @1KB (→ response seal)`);
+    if (prim.encode) console.log(`  encode @16KB         ${mbps(prim.encode.bytes_per_second).padStart(8)}      base64+json (→ response encode)`);
+    if (prim.cpu_hash) console.log(`  sha256 @1KB          ${mbps(prim.cpu_hash.bytes_per_second).padStart(8)}      (→ dedupe key)`);
   }
 
   console.log("\n  ── verdict: admit + rank on this ──");

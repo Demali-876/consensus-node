@@ -30,3 +30,15 @@ export {
   type MultiCorePoint,
   type MultiCoreOptions,
 } from "./suites/multi-core";
+export { runEd25519, type Ed25519Result, type Ed25519Options } from "./suites/ed25519";
+export {
+  runSessionDerive,
+  type SessionDeriveResult,
+  type SessionDeriveOptions,
+} from "./suites/session-derive";
+export {
+  runEncode,
+  type EncodeResult,
+  type EncodeSubResult,
+  type EncodeOptions,
+} from "./suites/encode";

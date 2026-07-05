@@ -27,6 +27,7 @@
     "test:register": "bun src/tests/register.test.ts",
     "test:benchmarks": "bun src/tests/benchmarks.test.ts",
     "test:composite-request": "bun src/tests/composite-request.test.ts",
+    "test:primitives": "bun src/tests/primitives.test.ts",
     "test:sustained": "bun src/tests/sustained.test.ts",
     "test:multi-core": "bun src/tests/multi-core.test.ts",
     "test:streams": "bun src/tests/streams.test.ts",
