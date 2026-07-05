@@ -116,10 +116,12 @@ const KID = "bench-kid";
 const TARGET_URL = "https://upstream.example.com/api/v1/resource?b=2&a=1";
 
 // Long-running consumers (the sustained suite) rotate to a fresh replay cache
-// every N iterations. JtiReplayCache.consume() degrades to a full O(maxEntries)
-// sweep per insert once the cache is at capacity with nothing expired yet
-// (tickets live 60s; a fast machine mints 100k in ~25s) — a real production
-// hazard in its own right, but an artifact this CPU benchmark must not measure.
+// every N iterations, keeping the jti cache well below its 100k bound so the
+// ticket_verify consume cost stays flat across the whole run (a plain has()+set(),
+// no eviction). That keeps the sustained suite's early-vs-late throttle ratio a
+// measure of the silicon, not of the cache slowly filling. (This also historically
+// dodged an O(maxEntries)-per-insert cliff in consume() at capacity — now fixed,
+// eviction is O(1) amortized — but rotation still keeps the measured cost steady.)
 const REPLAY_ROTATE_ITERATIONS = 50_000;
 
 // Realistic scoped GET: `accept`/`content-type` exercise the semantic-header

@@ -71,4 +71,55 @@ assert.equal(bounded.size, 2, 'cache stays bounded at maxEntries with all entrie
 assert.equal(bounded.consume('b', farFuture, 1000), false, 'still-cached jti rejected as replay');
 checks += 5;
 
-console.log(`tickets.test.ts: ${checks} checks passed — shared vectors verify under Bun + replay enforced + bounded`);
+// 4) Performance at capacity: once the cache is full of still-UNEXPIRED entries,
+// each insert must stay O(1) amortized. The earlier implementation force-swept
+// the entire map on every insert at capacity (O(maxEntries) per insert, removing
+// nothing when nothing had expired), so a busy node — ~4k req/s fills the 100k
+// cache in ~25s — then paid a full 100k-entry scan per request and collapsed.
+// This guards that regression with a time bound while re-checking that the
+// eviction semantics (duplicates rejected, oldest evicted first) still hold.
+{
+  const CAP = 100_000;
+  const INSERTS_AT_CAP = 10_000;
+  // O(1)-amortized inserts finish in well under 100ms; the O(maxEntries) cliff
+  // needs ~1e9 map iterations (many seconds). 1s cleanly separates them while
+  // tolerating a slow/loaded CI runner.
+  const PERF_BUDGET_MS = 1_000;
+  const now = 1000;
+  const perf = new JtiReplayCache(CAP);
+
+  // Fill exactly to capacity with unexpired entries (constant `now`, so the 30s
+  // janitor sweep runs once over an empty map and then stays gated out).
+  let allFresh = true;
+  for (let i = 0; i < CAP; i++) {
+    if (!perf.consume(`fill-${i}`, farFuture, now)) allFresh = false;
+  }
+  assert.ok(allFresh, 'every unique fill entry is accepted as fresh');
+  assert.equal(perf.size, CAP, 'cache filled exactly to capacity');
+
+  // Time INSERTS_AT_CAP more unexpired inserts — the path that used to degrade to
+  // a full scan per insert. GC first so a collection pause can't land in-window.
+  Bun.gc(true);
+  let allFreshAtCap = true;
+  const start = performance.now();
+  for (let i = 0; i < INSERTS_AT_CAP; i++) {
+    if (!perf.consume(`atcap-${i}`, farFuture, now)) allFreshAtCap = false;
+  }
+  const elapsedMs = performance.now() - start;
+  assert.ok(allFreshAtCap, 'every unique at-capacity insert is accepted as fresh');
+  assert.equal(perf.size, CAP, 'cache stays bounded at capacity after inserts at capacity');
+  assert.ok(
+    elapsedMs < PERF_BUDGET_MS,
+    `${INSERTS_AT_CAP} inserts at capacity stay O(1) amortized (took ${elapsedMs.toFixed(1)}ms, budget ${PERF_BUDGET_MS}ms)`,
+  );
+
+  // Eviction correctness at capacity, oldest-first: the most recent insert and a
+  // still-resident older fill are rejected as replays, while the very oldest fill
+  // (evicted on the first at-capacity insert) reads as fresh again.
+  assert.equal(perf.consume('atcap-9999', farFuture, now), false, 'most-recent insert still cached → replay rejected');
+  assert.equal(perf.consume('fill-99999', farFuture, now), false, 'a not-yet-evicted fill entry still cached');
+  assert.equal(perf.consume('fill-0', farFuture, now), true, 'oldest entry was evicted first');
+  checks += 8;
+}
+
+console.log(`tickets.test.ts: ${checks} checks passed — shared vectors verify under Bun + replay enforced + bounded + O(1) at capacity`);
