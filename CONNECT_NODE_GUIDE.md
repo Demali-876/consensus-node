@@ -1,6 +1,6 @@
 # Connect a Node to the Consensus Network
 
-**This guide is AI Generatate and is pending human review.**
+**This guide is AI Generated and is pending human review.**
 
 This guide connects one machine as a Consensus worker node using the supported
 gateway data-plane deployment. In this mode the node does not need public inbound
