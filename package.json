@@ -27,6 +27,8 @@
     "test:register": "bun src/tests/register.test.ts",
     "test:benchmarks": "bun src/tests/benchmarks.test.ts",
     "test:composite-request": "bun src/tests/composite-request.test.ts",
+    "test:sustained": "bun src/tests/sustained.test.ts",
+    "test:multi-core": "bun src/tests/multi-core.test.ts",
     "test:streams": "bun src/tests/streams.test.ts",
     "test:update-reply-to": "bun src/tests/update-reply-to.test.ts",
     "test:ssrf": "bun src/tests/ssrf.test.ts",

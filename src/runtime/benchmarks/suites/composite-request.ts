@@ -115,6 +115,13 @@ const NODE_ID = "bench-node";
 const KID = "bench-kid";
 const TARGET_URL = "https://upstream.example.com/api/v1/resource?b=2&a=1";
 
+// Long-running consumers (the sustained suite) rotate to a fresh replay cache
+// every N iterations. JtiReplayCache.consume() degrades to a full O(maxEntries)
+// sweep per insert once the cache is at capacity with nothing expired yet
+// (tickets live 60s; a fast machine mints 100k in ~25s) — a real production
+// hazard in its own right, but an artifact this CPU benchmark must not measure.
+const REPLAY_ROTATE_ITERATIONS = 50_000;
+
 // Realistic scoped GET: `accept`/`content-type` exercise the semantic-header
 // canonicalization, `x-api-key` forces the scope hash, the rest is passthrough.
 const REQUEST_HEADERS: Record<string, string> = {
@@ -169,6 +176,42 @@ export async function runCompositeRequest(
     results,
     requests_per_second: headline?.node_requests_per_second ?? 0,
     reliable: results.every((r) => r.reliable),
+  };
+}
+
+/** Reusable handle on the composite workload for suites that drive iterations
+ *  on their own schedule (sustained) instead of through the runner. Cumulative
+ *  node-side time and iteration counts let callers window node-only throughput
+ *  by snapshotting between calls. */
+export interface CompositeWorkload {
+  response_bytes: number;
+  /** One untimed round trip through the REAL production pipeline — run once
+   *  before measuring to prove the fixtures are valid. */
+  sanity(): Promise<void>;
+  /** One full request lifecycle (client prep + timed node stages). */
+  iterate(): Promise<void>;
+  /** Cumulative timed node-side nanoseconds across all iterations. */
+  nodeNs(): bigint;
+  iterations(): number;
+}
+
+export function createCompositeWorkload(responseBytes: number): CompositeWorkload {
+  const fixture = buildFixture(responseBytes);
+  const totals = newStageTotals();
+  let sinceRotate = 0;
+
+  return {
+    response_bytes: responseBytes,
+    sanity: () => sanityRoundTrip(fixture),
+    iterate: async () => {
+      if (++sinceRotate >= REPLAY_ROTATE_ITERATIONS) {
+        fixture.replay = new JtiReplayCache();
+        sinceRotate = 0;
+      }
+      await runIteration(fixture, totals);
+    },
+    nodeNs: () => STAGE_NAMES.reduce((sum, stage) => sum + totals[stage], 0n),
+    iterations: () => totals.iterations,
   };
 }
 

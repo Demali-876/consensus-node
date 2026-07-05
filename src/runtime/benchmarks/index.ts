@@ -6,6 +6,7 @@ export { runMemory, type MemoryResult, type MemoryCopySubResult } from "./suites
 export { runEventLoop, type EventLoopResult } from "./suites/event-loop";
 export {
   runCompositeRequest,
+  createCompositeWorkload,
   DEFAULT_COMPOSITE_SIZES,
   type CompositeRequestResult,
   type CompositeRequestSubResult,
@@ -13,4 +14,19 @@ export {
   type CompositeSizeConfig,
   type CompositeStageName,
   type CompositeStageStats,
+  type CompositeWorkload,
 } from "./suites/composite-request";
+export {
+  runSustained,
+  STEADY_RATIO_FLOOR,
+  type SustainedResult,
+  type SustainedWindow,
+  type SustainedOptions,
+} from "./suites/sustained";
+export {
+  runMultiCore,
+  defaultPoints,
+  type MultiCoreResult,
+  type MultiCorePoint,
+  type MultiCoreOptions,
+} from "./suites/multi-core";
