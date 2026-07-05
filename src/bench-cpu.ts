@@ -47,6 +47,7 @@ import {
   runCompositeRequest,
   type CompositeRequestResult,
   type CompositeStageName,
+  type CompositeStageStats,
 } from "./runtime/benchmarks/suites/composite-request";
 import {
   runSustained,
@@ -65,10 +66,28 @@ const DRIFT_FACTOR_WARN = 4;
 // core — hypervisor steal or host contention, not necessarily slow silicon.
 const CPU_TIME_RATIO_WARN = 0.9;
 
+interface AdmissionMetric {
+  // The ONE number the network admits and ranks on: stable sustained node-side
+  // requests/sec at 16KB responses. 16KB is deliberately heavier than real
+  // traffic (typical responses are ~1KB), so a node never underperforms its
+  // rating. "Stable" means the 60s sustained suite held steady on an owned core
+  // — that suite, not the short composite burst, is the 16KB authority.
+  metric: "stable_sustained_16kb_req_s";
+  capacity_req_s: number;
+  /** Conservative floor: the slowest 5s window of the sustained run. */
+  floor_req_s: number;
+  /** "sustained" = 60s windowed authority; "burst" = short composite only
+   *  (--quick or sustained skipped), which never counts as stable. */
+  basis: "sustained" | "burst";
+  stable: boolean;
+  /** Why the capacity is not admissible-stable (empty when stable). */
+  blockers: string[];
+}
+
 interface CpuBenchReport {
   meta: {
     tool: "consensus-cpu-bench";
-    version: 2;
+    version: 3;
     started_at: string;
     duration_ms: number;
     quick: boolean;
@@ -78,10 +97,75 @@ interface CpuBenchReport {
   composite: CompositeRequestResult;
   primitives: { cpu_hash: CpuHashResult | null; crypto_aead: CryptoAeadResult | null };
   character: { sustained: SustainedResult | null; multi_core: MultiCoreResult | null };
-  /** Headline: node-side requests/sec at 16KB responses, single core. */
+  /** PRIMARY: admit + rank on this. */
+  admission: AdmissionMetric;
+  /** SECONDARY health/diagnostics — never gate admission. */
+  secondary: {
+    small_1kb_req_s: number | null; // small-payload ceiling
+    large_256kb_req_s: number | null; // large-payload behaviour
+    dominant_stage_16kb: { name: CompositeStageName; share: number } | null;
+  };
+  /** Back-compat alias of admission.capacity_req_s. */
   requests_per_second: number;
+  /** Back-compat alias of admission.stable. */
   reliable: boolean;
+  /** Measurement-invalidating problems (busy machine, mid-run drift) → rerun. */
   warnings: string[];
+  /** Non-blocking diagnostics (large-payload GC noise, bottleneck location). */
+  notes: string[];
+}
+
+/** The admission verdict. The sustained suite is the 16KB authority; the short
+ *  composite only supplies the burst fallback for --quick. Throttling and a
+ *  shared core are blockers (real numbers, node fails the bar), distinct from
+ *  measurement-invalidating warnings (busy machine, drift) passed via
+ *  `measurementValid`. */
+function deriveAdmission(
+  composite: CompositeRequestResult,
+  sustained: SustainedResult | null,
+  measurementValid: boolean,
+): AdmissionMetric {
+  const c16 = composite.results.find((r) => r.response_size_bytes === 16384) ?? null;
+
+  if (!sustained) {
+    return {
+      metric: "stable_sustained_16kb_req_s",
+      capacity_req_s: Math.round(c16?.node_requests_per_second ?? composite.requests_per_second),
+      floor_req_s: 0,
+      basis: "burst",
+      stable: false,
+      blockers: ["sustained suite not run — burst estimate only, not admissible"],
+    };
+  }
+
+  const blockers: string[] = [];
+  if (!measurementValid) blockers.push("measurement invalid — see warnings");
+  if (!sustained.steady) {
+    blockers.push(`throttled: ratio ${sustained.throttle_ratio} < ${STEADY_RATIO_FLOOR} (burst credits or thermal)`);
+  }
+  if (sustained.cpu_time_ratio < CPU_TIME_RATIO_WARN) {
+    blockers.push(`shared core: cpu time ratio ${sustained.cpu_time_ratio} < ${CPU_TIME_RATIO_WARN} (steal/contention)`);
+  }
+
+  return {
+    metric: "stable_sustained_16kb_req_s",
+    capacity_req_s: Math.round(sustained.node_rps_mean),
+    floor_req_s: Math.round(sustained.node_rps_min_window),
+    basis: "sustained",
+    stable: blockers.length === 0,
+    blockers,
+  };
+}
+
+function topStage(
+  stages: Record<CompositeStageName, CompositeStageStats>,
+): { name: CompositeStageName; share: number } | null {
+  let best: { name: CompositeStageName; share: number } | null = null;
+  for (const name of Object.keys(stages) as CompositeStageName[]) {
+    const share = stages[name].share;
+    if (!best || share > best.share) best = { name, share };
+  }
+  return best;
 }
 
 async function main(): Promise<void> {
@@ -135,18 +219,11 @@ async function main(): Promise<void> {
     cryptoAead = await runCryptoAead();
 
     if (sustainedSeconds > 0) {
-      say(`  sustained  ${sustainedSeconds}s of continuous load @16KB (watching for throttle)...`);
+      say(`  sustained  ${sustainedSeconds}s of continuous load @16KB (the admission metric)...`);
       sustained = await runSustained({ durationMs: sustainedSeconds * 1000 });
-      if (!sustained.steady) {
-        warnings.push(
-          `throttle ratio ${sustained.throttle_ratio} (< ${STEADY_RATIO_FLOOR}): throughput decayed under sustained load — burst credits or thermal throttling`,
-        );
-      }
-      if (sustained.cpu_time_ratio < CPU_TIME_RATIO_WARN) {
-        warnings.push(
-          `cpu time ratio ${sustained.cpu_time_ratio} (< ${CPU_TIME_RATIO_WARN}): the process was not getting a full core — hypervisor steal or host contention`,
-        );
-      }
+      // Throttle / shared-core outcomes are admission BLOCKERS, not
+      // measurement-invalidating warnings — the numbers are real, the node just
+      // fails the bar. deriveAdmission() folds them in below.
     }
 
     say("  multi-core scaling across workers...");
@@ -165,16 +242,30 @@ async function main(): Promise<void> {
     }
   }
 
-  if (!composite.reliable) {
-    warnings.push(
-      "composite variance exceeded 10% (reliable: false) — do not act on these numbers; rerun on an idle machine",
-    );
+  // Per-size composite variance is a DIAGNOSTIC note, never an admission gate.
+  // 256KB is the noisiest (large-buffer GC) and least representative; 1KB is the
+  // small-payload ceiling. The 16KB authority is the sustained suite, not this.
+  const notes: string[] = [];
+  for (const sub of composite.results) {
+    if (sub.reliable) continue;
+    const why = sub.response_size_bytes >= 262144 ? "large-payload GC noise, expected" : "noisy sampling";
+    notes.push(`${kb(sub.response_size_bytes)} composite variance ${(sub.exchange.cv * 100).toFixed(1)}% (> 10%) — ${why}; diagnostic only`);
   }
+
+  const c1k = composite.results.find((r) => r.response_size_bytes === 1024) ?? null;
+  const c256k = composite.results.find((r) => r.response_size_bytes === 262144) ?? null;
+  const c16 = composite.results.find((r) => r.response_size_bytes === 16384) ?? null;
+  const dominantStage = c16 ? topStage(c16.stages) : null;
+  if (dominantStage) {
+    notes.push(`bottleneck @16KB: ${dominantStage.name} is ${(dominantStage.share * 100).toFixed(0)}% of node-side time`);
+  }
+
+  const admission = deriveAdmission(composite, sustained, warnings.length === 0);
 
   const report: CpuBenchReport = {
     meta: {
       tool: "consensus-cpu-bench",
-      version: 2,
+      version: 3,
       started_at: startedAt,
       duration_ms: Math.round(Number(hrtime.bigint() - t0) / 1e6),
       quick,
@@ -184,9 +275,16 @@ async function main(): Promise<void> {
     composite,
     primitives: { cpu_hash: cpuHash, crypto_aead: cryptoAead },
     character: { sustained, multi_core: multiCore },
-    requests_per_second: composite.requests_per_second,
-    reliable: composite.reliable && warnings.length === 0,
+    admission,
+    secondary: {
+      small_1kb_req_s: c1k ? Math.round(c1k.node_requests_per_second) : null,
+      large_256kb_req_s: c256k ? Math.round(c256k.node_requests_per_second) : null,
+      dominant_stage_16kb: dominantStage,
+    },
+    requests_per_second: admission.capacity_req_s,
+    reliable: admission.stable,
     warnings,
+    notes,
   };
 
   if (json) {
@@ -244,19 +342,36 @@ function printSummary(report: CpuBenchReport): void {
     console.log(`  chacha20-poly1305    ${mbps(report.primitives.crypto_aead.total_bytes_per_second)} round-trip @1KB`);
   }
 
-  console.log(`\n  headline: ~${fmtRps(report.requests_per_second)} req/s @16KB, single core`);
+  console.log("\n  ── verdict: admit + rank on this ──");
+  const a = report.admission;
+  if (a.basis === "sustained") {
+    console.log(`  admission capacity: ${fmtRps(a.capacity_req_s)} req/s   stable sustained 16KB (floor ${fmtRps(a.floor_req_s)})`);
+  } else {
+    console.log(`  admission capacity: ~${fmtRps(a.capacity_req_s)} req/s   16KB burst estimate — run without --quick for a stable figure`);
+  }
+  const sec = report.secondary;
+  if (sec.small_1kb_req_s != null || sec.large_256kb_req_s != null) {
+    const parts: string[] = [];
+    if (sec.small_1kb_req_s != null) parts.push(`1KB ceiling ${fmtRps(sec.small_1kb_req_s)}`);
+    if (sec.large_256kb_req_s != null) parts.push(`256KB ${fmtRps(sec.large_256kb_req_s)}`);
+    console.log(`  secondary (health): ${parts.join(", ")} req/s`);
+  }
+  console.log(`  ${a.stable ? "✅ ADMISSIBLE — stable" : "⛔ NOT admissible"}`);
+  for (const blocker of a.blockers) console.log(`    ✗ ${blocker}`);
   for (const warning of report.warnings) console.log(`  ⚠ ${warning}`);
-  console.log(`  ${report.reliable ? "measurement reliable" : "measurement NOT reliable"} — ${(report.meta.duration_ms / 1000).toFixed(1)}s total\n`);
+  for (const note of report.notes) console.log(`  · ${note}`);
+  console.log(`  ${(report.meta.duration_ms / 1000).toFixed(1)}s total\n`);
 }
 
 function printHelp(): void {
   console.log(`Usage: bun run bench:cpu [options]
 
-Judge what this machine's CPU can do as a Consensus node: runs the real
-per-request data-plane pipeline (handshake, ticket verify, AEAD, encode)
-in memory and reports single-core requests/sec by response size, then
-character tests — sustained load (throttle detection) and multi-core
-scaling (real vs advertised cores).
+Judge what this machine's CPU can do as a Consensus node. The admission
+metric — what the network admits and ranks on — is stable sustained
+node-side requests/sec at 16KB responses (the 60s sustained suite). 1KB
+(small-payload ceiling) and 256KB (large-payload behaviour) are secondary
+health checks and bottleneck diagnostics, never gates. Also runs
+multi-core scaling (real vs advertised cores).
 
 Options:
   --quick                 composite suite only, short measurement windows
