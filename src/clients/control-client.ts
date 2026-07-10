@@ -12,6 +12,7 @@ import { loadOrCreateIdentity } from "../crypto/identity";
 import { executeProxySessionMessage } from "../runtime/proxy-session";
 import { connectEncryptedTunnel } from "../tunnel/connect";
 import { MESSAGE_TYPE, TUNNEL_MODE, createErrorMessage, nowSeconds } from "../tunnel/messages";
+import { runEvalAction } from "../runtime/eval";
 import { compareManifests, downloadAndVerify } from "../update";
 import { JtiReplayCache } from "../tickets/replay";
 import { loadPinnedOrchestratorKey } from "../tickets/orchestrator-key";
@@ -203,6 +204,48 @@ export async function startControlClient(options: ControlClientOptions) {
         }));
       } finally {
         activeRequests = Math.max(0, activeRequests - 1);
+      }
+      return;
+    }
+
+    if (message.type === MESSAGE_TYPE.EVAL_REQUEST) {
+      // During a stability trial the orchestrator drives two probes over the
+      // control tunnel: an occasional sustained-bench sample (thermal) and an
+      // integrity re-attestation. Reuse the same runEvalAction dispatch as eval,
+      // but only for those read-only actions.
+      const allowed = message.action === "benchmark_sustained" || message.action === "integrity";
+      if (!allowed) {
+        await client.send(createErrorMessage({
+          reply_to: message.id,
+          code: "eval_action_not_allowed",
+          message: `Action not allowed on the control tunnel: ${message.action}`,
+        }));
+        return;
+      }
+      log.info("control-client", "trial-probe", {
+        node_id: nodeId,
+        session_id: connected.sessionId,
+        action: message.action,
+      });
+      try {
+        const result = await runEvalAction(message.action, message.params ?? {});
+        await client.send({
+          type: MESSAGE_TYPE.EVAL_RESPONSE,
+          timestamp: nowSeconds(),
+          reply_to: message.id ?? "",
+          action: message.action,
+          ok: true,
+          result,
+        });
+      } catch (error) {
+        await client.send({
+          type: MESSAGE_TYPE.EVAL_RESPONSE,
+          timestamp: nowSeconds(),
+          reply_to: message.id ?? "",
+          action: message.action,
+          ok: false,
+          error: error instanceof Error ? error.message : String(error),
+        });
       }
       return;
     }
