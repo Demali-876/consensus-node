@@ -11,6 +11,7 @@ const options = optionsFromEnv({
   CONSENSUS_EVM_ADDRESS: "0x0000000000000000000000000000000000000000",
   CONSENSUS_SOLANA_ADDRESS: "11111111111111111111111111111111",
   CONSENSUS_ICP_ADDRESS: "aaaaa-aa",
+  CONSENSUS_MACHINE_ID: "machine-test",
 });
 
 assert.equal(options.port, 9090);
@@ -35,5 +36,6 @@ assert.equal(payload.pubkey_ed25519_pem.includes("BEGIN PUBLIC KEY"), true);
 assert.equal(payload.capabilities.forward_proxy, true);
 assert.equal(payload.ipv4, "203.0.113.10");
 assert.equal(payload.email_verification_token, "email-token");
+assert.equal(payload.machine_id, "machine-test");
 
 console.log("register ok");

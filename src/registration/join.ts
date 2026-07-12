@@ -1,5 +1,6 @@
 import { loadOrCreateIdentity } from "../crypto/identity";
 import { capabilitiesRecord } from "../runtime/capabilities";
+import { assertMachineCanRegister, claimMachineNode } from "../node/machine";
 import { loadConfig, loadJoinAuthorization, saveConfig, type JoinAuthorization } from "../node/state";
 import { resolvePinnedPubkey } from "../tickets/orchestrator-key";
 import type { OrchestratorPublicJwk } from "../types";
@@ -14,6 +15,7 @@ export interface RegisterNodeOptions {
   evmAddress: string;
   solanaAddress: string;
   icpAddress: string;
+  machineId?: string;
 }
 
 export interface JoinPayload {
@@ -26,6 +28,7 @@ export interface JoinPayload {
   evm_address: string;
   solana_address: string;
   icp_address: string;
+  machine_id?: string;
   capabilities: ReturnType<typeof capabilitiesRecord>;
   join_id: string;
   join_signature: string;
@@ -49,8 +52,10 @@ export interface JoinResponse {
 export async function registerNode(options: RegisterNodeOptions): Promise<JoinResponse> {
   const identity = await loadOrCreateIdentity();
   const joinAuth = await requireJoinAuthorization();
+  const existing = await loadConfig();
+  const machine = await assertMachineCanRegister({ existingNodeId: existing.node_id });
   const payload = buildJoinPayload({
-    options,
+    options: { ...options, machineId: options.machineId ?? machine.machine_id },
     publicKeyPem: identity.publicKeyPem,
     joinAuth,
   });
@@ -75,10 +80,14 @@ export async function registerNode(options: RegisterNodeOptions): Promise<JoinRe
     throw new Error("Node join failed: malformed response");
   }
 
-  const existing = await loadConfig();
+  if (machine.node_id && machine.node_id !== body.node_id) {
+    throw new Error(`This machine is already registered as ${machine.node_id}; server returned ${body.node_id}`);
+  }
+
   await saveConfig({
     ...existing,
     node_id: body.node_id,
+    machine_id: machine.machine_id,
     domain: body.domain,
     region: body.region,
     ipv4: body.ipv4,
@@ -89,6 +98,10 @@ export async function registerNode(options: RegisterNodeOptions): Promise<JoinRe
     // Preserve a prior trust anchor unless the response carries a replacement —
     // a key-less response (older server / FREE_MODE) must not wipe the pin.
     orchestrator_pubkey: resolvePinnedPubkey(existing.orchestrator_pubkey, body.orchestrator_pubkey),
+  });
+  await claimMachineNode({
+    nodeId: body.node_id,
+    installDir: process.env.CONSENSUS_NODE_INSTALL_DIR?.trim() || undefined,
   });
 
   return body;
@@ -109,6 +122,7 @@ export function buildJoinPayload(input: {
     evm_address: input.options.evmAddress,
     solana_address: input.options.solanaAddress,
     icp_address: input.options.icpAddress,
+    machine_id: input.options.machineId,
     capabilities: capabilitiesRecord(),
     join_id: input.joinAuth.join_id,
     join_signature: input.joinAuth.signature,
@@ -126,6 +140,7 @@ export function optionsFromEnv(env: NodeJS.ProcessEnv = process.env): RegisterNo
     evmAddress: requiredEnv(env, "CONSENSUS_EVM_ADDRESS"),
     solanaAddress: requiredEnv(env, "CONSENSUS_SOLANA_ADDRESS"),
     icpAddress: requiredEnv(env, "CONSENSUS_ICP_ADDRESS"),
+    machineId: optionalEnv(env, "CONSENSUS_MACHINE_ID") ?? undefined,
   };
 }
 

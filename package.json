@@ -27,6 +27,7 @@
     "test:control-client": "bun src/tests/control-client.test.ts",
     "test:register": "bun src/tests/register.test.ts",
     "test:wallet-capture": "bun src/tests/wallet-capture.test.ts",
+    "test:machine-lock": "bun src/tests/machine-lock.test.ts",
     "test:benchmarks": "bun src/tests/benchmarks.test.ts",
     "test:composite-request": "bun src/tests/composite-request.test.ts",
     "test:primitives": "bun src/tests/primitives.test.ts",

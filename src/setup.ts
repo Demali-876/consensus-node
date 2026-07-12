@@ -4,6 +4,7 @@ import path from "node:path";
 import readline from "node:readline/promises";
 import { stdin as input, stdout as output } from "node:process";
 import { downloadAndVerify, fetchRequiredManifest } from "./update";
+import { claimMachineNode } from "./node/machine";
 import { loadConfig, loadJoinAuthorization, loadSetupProgress, saveSetupProgress, stateDir, type SetupProgress } from "./node/state";
 import { mergeWalletAddresses, openWalletAddressPage, startWalletAddressServer, validateWalletAddresses } from "./registration/wallet-capture";
 
@@ -108,6 +109,7 @@ async function main(): Promise<void> {
 
     const existingConfig = await loadConfig();
     if (existingConfig.node_id && await confirm(rl, `Node already registered as ${existingConfig.node_id}; skip registration?`, true)) {
+      await claimMachineNode({ nodeId: existingConfig.node_id, installDir });
       console.log("\nSetup complete.");
       console.log(`Node ID: ${existingConfig.node_id}`);
       if (existingConfig.domain) console.log(`Domain: ${existingConfig.domain}`);

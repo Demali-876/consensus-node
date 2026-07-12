@@ -18,6 +18,7 @@ export interface OrchestratorPublicJwk {
 
 export interface NodeConfig {
   node_id?: string;
+  machine_id?: string;
   domain?: string;
   region?: string;
   ipv4?: string | null;
