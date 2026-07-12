@@ -22,7 +22,7 @@ async function main(): Promise<void> {
     const installDir = await question(rl, "Runtime install directory", progress.installDir ?? DEFAULT_INSTALL_DIR);
     progress = await remember(progress, { serverUrl, installDir });
 
-    await assertBunAvailable();
+    await ensureBunAvailable(rl);
     await ensurePm2Available(rl);
     console.log("\nFetching approved release manifest from Consensus server...");
     const manifest = await fetchRequiredManifest(serverUrl);
@@ -204,21 +204,43 @@ async function postJson<T>(url: string, body: unknown): Promise<T> {
   return parsed;
 }
 
-async function assertBunAvailable(): Promise<void> {
-  await run("bun", ["--version"], {});
+async function ensureBunAvailable(rl: readline.Interface): Promise<void> {
+  const existing = await resolveExecutable("bun", bunFallbackPaths());
+  if (existing) {
+    addExecutableDirToPath(existing);
+    await run(existing, ["--version"], {});
+    return;
+  }
+
+  console.log("\nBun is required to install and run the Consensus node runtime.");
+  if (!await confirm(rl, "Install Bun now?", false)) {
+    throw new Error("Bun is required. Run `scripts/ensure-bun.sh`, then rerun setup.");
+  }
+
+  await runScript("scripts/ensure-bun.sh", ["--yes"], {});
+  const bun = await resolveExecutable("bun", bunFallbackPaths());
+  if (!bun) throw new Error("Bun installed, but bun was not found on PATH or in standard locations.");
+  addExecutableDirToPath(bun);
+  await run(bun, ["--version"], {});
 }
 
 async function ensurePm2Available(rl: readline.Interface): Promise<void> {
-  if (await resolveExecutable("pm2")) return;
+  const existing = await resolveExecutable("pm2", pm2FallbackPaths());
+  if (existing) {
+    addExecutableDirToPath(existing);
+    await run(existing, ["--version"], {});
+    return;
+  }
 
   console.log("\nPM2 is required for the recommended node process manager.");
   if (!await confirm(rl, "Install PM2 and any missing macOS dependencies now?", false)) {
     throw new Error("PM2 is required. Run `scripts/ensure-pm2.sh`, then rerun setup.");
   }
 
-  await runScript("scripts/ensure-pm2.sh", [], {});
-  const pm2 = await resolveExecutable("pm2", ["/opt/homebrew/bin/pm2", "/usr/local/bin/pm2"]);
+  await runScript("scripts/ensure-pm2.sh", ["--yes"], {});
+  const pm2 = await resolveExecutable("pm2", pm2FallbackPaths());
   if (!pm2) throw new Error("PM2 installed, but pm2 was not found on PATH or in standard Homebrew locations.");
+  addExecutableDirToPath(pm2);
   await run(pm2, ["--version"], {});
 }
 
@@ -237,8 +259,9 @@ async function offerStartPm2(rl: readline.Interface, installDir: string, serverU
 
   const nodeStateDir = stateDir();
   await fs.mkdir(nodeStateDir, { recursive: true });
-  const pm2 = await resolveExecutable("pm2", ["/opt/homebrew/bin/pm2", "/usr/local/bin/pm2"]);
+  const pm2 = await resolveExecutable("pm2", pm2FallbackPaths());
   if (!pm2) throw new Error("PM2 is not available. Run `scripts/ensure-pm2.sh`, then rerun setup.");
+  addExecutableDirToPath(pm2);
   await run(pm2, ["startOrReload", configPath, "--only", appName, "--update-env"], {
     CONSENSUS_SERVER_URL: serverUrl,
     CONSENSUS_STATE_DIR: nodeStateDir,
@@ -247,6 +270,7 @@ async function offerStartPm2(rl: readline.Interface, installDir: string, serverU
     CONSENSUS_PM2_NAME: appName,
     CONSENSUS_NODE_UPDATE_COMMAND: path.join(installDir, "current", "scripts", "install-release.sh"),
   });
+  await verifyPm2Online(pm2, appName);
   await run(pm2, ["save"], {});
 
   console.log(`PM2 is managing ${appName}.`);
@@ -346,6 +370,54 @@ async function run(command: string, args: string[], env: Record<string, string>,
   });
 }
 
+async function verifyPm2Online(pm2: string, appName: string): Promise<void> {
+  await sleep(pm2VerifyDelayMs());
+  const output = await runForOutput(pm2, ["jlist"]);
+  const status = pm2StatusFromJlist(output, appName);
+  if (status !== "online") {
+    throw new Error(`PM2 accepted ${appName}, but it did not reach online status (status: ${status || "missing"}). Run \`pm2 logs ${appName}\` for details.`);
+  }
+}
+
+async function runForOutput(command: string, args: string[], cwd = process.cwd()): Promise<string> {
+  return await new Promise<string>((resolve, reject) => {
+    const child = spawn(command, args, {
+      cwd,
+      env: process.env,
+      stdio: ["ignore", "pipe", "pipe"],
+    });
+    let stdout = "";
+    let stderr = "";
+    child.stdout.on("data", (chunk: Buffer) => {
+      stdout += chunk.toString();
+    });
+    child.stderr.on("data", (chunk: Buffer) => {
+      stderr += chunk.toString();
+    });
+    child.on("exit", (code) => code === 0 ? resolve(stdout) : reject(new Error(stderr.trim() || `${command} exited with code ${code}`)));
+    child.on("error", reject);
+  });
+}
+
+function pm2StatusFromJlist(output: string, appName: string): string | null {
+  try {
+    const apps = JSON.parse(output) as Array<{ name?: string; pm2_env?: { status?: string } }>;
+    const app = Array.isArray(apps) ? apps.find((candidate) => candidate.name === appName) : null;
+    return app?.pm2_env?.status ?? null;
+  } catch {
+    return null;
+  }
+}
+
+function pm2VerifyDelayMs(): number {
+  const seconds = Number(process.env.CONSENSUS_PM2_VERIFY_DELAY_SECONDS ?? "2");
+  return Number.isFinite(seconds) && seconds >= 0 ? seconds * 1000 : 2000;
+}
+
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
 async function commandSucceeds(command: string, args: string[]): Promise<boolean> {
   return await new Promise<boolean>((resolve) => {
     const child = spawn(command, args, {
@@ -365,6 +437,29 @@ async function resolveExecutable(command: string, fallbackPaths: string[] = []):
   }
 
   return null;
+}
+
+function bunFallbackPaths(): string[] {
+  return [
+    path.join(process.env.HOME ?? ".", ".bun", "bin", "bun"),
+    "/opt/homebrew/bin/bun",
+    "/usr/local/bin/bun",
+  ];
+}
+
+function pm2FallbackPaths(): string[] {
+  return [
+    "/opt/homebrew/bin/pm2",
+    "/usr/local/bin/pm2",
+  ];
+}
+
+function addExecutableDirToPath(executable: string): void {
+  const dir = path.dirname(executable);
+  const current = process.env.PATH ?? "";
+  if (!current.split(path.delimiter).includes(dir)) {
+    process.env.PATH = `${dir}${path.delimiter}${current}`;
+  }
 }
 
 async function which(command: string): Promise<string | null> {

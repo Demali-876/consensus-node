@@ -45,6 +45,34 @@ if [[ ! -f "${config}" ]]; then
   exit 66
 fi
 
+verify_pm2_online() {
+  local delay="${CONSENSUS_PM2_VERIFY_DELAY_SECONDS:-2}"
+  sleep "${delay}"
+
+  local status
+  status="$("${pm2_bin}" jlist | node -e '
+const appName = process.argv[1];
+let input = "";
+process.stdin.on("data", (chunk) => input += chunk);
+process.stdin.on("end", () => {
+  try {
+    const apps = JSON.parse(input);
+    const app = Array.isArray(apps) ? apps.find((item) => item && item.name === appName) : null;
+    process.stdout.write(app && app.pm2_env && app.pm2_env.status ? app.pm2_env.status : "");
+  } catch {
+    process.exit(2);
+  }
+});
+' "${pm2_name}" 2>/dev/null || true)"
+
+  if [[ "${status}" != "online" ]]; then
+    echo "PM2 accepted ${pm2_name}, but it did not reach online status (status: ${status:-missing})." >&2
+    echo "Check logs with: pm2 logs ${pm2_name}" >&2
+    "${pm2_bin}" logs "${pm2_name}" --lines 20 --nostream 2>/dev/null || true
+    exit 70
+  fi
+}
+
 mkdir -p "${state_dir}"
 
 export CONSENSUS_NODE_INSTALL_DIR="${install_dir}"
@@ -55,6 +83,7 @@ export CONSENSUS_NODE_RELEASE_RETENTION="${release_retention}"
 export CONSENSUS_NODE_UPDATE_COMMAND="${CONSENSUS_NODE_UPDATE_COMMAND:-"${install_dir}/current/scripts/install-release.sh"}"
 
 "${pm2_bin}" startOrReload "${config}" --only "${pm2_name}" --update-env
+verify_pm2_online
 "${pm2_bin}" save
 
 echo "PM2 is managing ${pm2_name}."

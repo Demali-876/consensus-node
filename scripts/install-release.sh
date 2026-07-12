@@ -6,6 +6,8 @@ target_version="${CONSENSUS_NODE_TARGET_VERSION:-${2:-}}"
 install_dir="${CONSENSUS_NODE_INSTALL_DIR:-"$HOME/.consensus/node-runtime"}"
 release_retention="${CONSENSUS_NODE_RELEASE_RETENTION:-3}"
 running_release="$(pwd -P 2>/dev/null || true)"
+lock_dir="${install_dir}/.install.lock"
+lock_acquired=0
 
 if [[ -z "${artifact}" ]]; then
   echo "CONSENSUS_NODE_ARTIFACT_PATH or first argument is required" >&2
@@ -22,13 +24,35 @@ if ! [[ "${release_retention}" =~ ^[0-9]+$ ]] || (( release_retention < 1 )); th
   exit 64
 fi
 
-mkdir -p "${install_dir}/releases"
+mkdir -p "${install_dir}"
 
-tmp_dir="$(mktemp -d "${install_dir}/.install.XXXXXX")"
+acquire_lock() {
+  local waited=0
+  while ! mkdir "${lock_dir}" 2>/dev/null; do
+    if (( waited >= 300 )); then
+      echo "Timed out waiting for installer lock: ${lock_dir}" >&2
+      exit 75
+    fi
+    sleep 1
+    waited=$((waited + 1))
+  done
+  lock_acquired=1
+}
+
+tmp_dir=""
 cleanup() {
-  rm -rf "${tmp_dir}"
+  if [[ -n "${tmp_dir}" ]]; then
+    rm -rf "${tmp_dir}"
+  fi
+  if [[ "${lock_acquired}" == "1" ]]; then
+    rmdir "${lock_dir}" 2>/dev/null || true
+  fi
 }
 trap cleanup EXIT
+
+acquire_lock
+mkdir -p "${install_dir}/releases"
+tmp_dir="$(mktemp -d "${install_dir}/.install.XXXXXX")"
 
 tar -xzf "${artifact}" -C "${tmp_dir}"
 release_root="${tmp_dir}/consensus-node"
@@ -43,7 +67,7 @@ if [[ -n "${target_version}" && "${version}" != "${target_version}" ]]; then
   exit 65
 fi
 
-release_id="${version}-$(date -u +%Y%m%d%H%M%S)"
+release_id="${version}-$(date -u +%Y%m%d%H%M%S)-$$"
 release_dir="${install_dir}/releases/${release_id}"
 
 mv "${release_root}" "${release_dir}"
