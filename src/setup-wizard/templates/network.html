@@ -1,0 +1,115 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Consensus Node Setup · Network Benchmark</title>
+<link rel="icon" type="image/svg+xml" href="{{FAVICON_URL}}">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+{{STYLES}}
+</style>
+</head>
+<body>
+<div class="page" style="--consensus-logo:url('{{LOGO_URL}}')">
+  <div class="grid-bg"></div>
+  <div class="mark"></div>
+  <header class="nav">
+    <div class="nav-inner">
+      <a href="#" class="brand" aria-label="Consensus"><img src="{{LOGO_URL}}" alt=""><span class="word">Consensus</span></a>
+      <span class="badge"><span class="dot"></span>Node sign-up</span>
+    </div>
+  </header>
+  <main class="shell">
+    <section class="main network-main">
+      <div class="eyebrow mono">Network benchmark</div>
+      <div>
+        <h1>Confirm network reachability</h1>
+        <p class="connection-copy">Consensus records this machine's public IPv4, optional IPv6, and region, then runs a benchmark over an encrypted channel before registration. The benchmark measures whether this machine can reliably serve proxy, WebSocket, and tunnel traffic.</p>
+      </div>
+      <div class="step-bars" aria-label="Setup progress">
+        <span class="step-bar done"></span>
+        <span class="step-bar done"></span>
+        <span class="step-bar done"></span>
+        <span class="step-bar active"></span>
+        <span class="step-bar"></span>
+        <span class="step-bar"></span>
+      </div>
+
+      <section class="network-grid" aria-label="Network results">
+        <div class="network-card">
+          <div class="network-card-head"><span class="label mono">IPv4</span><span class="req-tag required">Required</span></div>
+          <div class="network-value mono" id="ipv4-value">pending</div>
+          <p>Public IPv4 is required for node reachability.</p>
+        </div>
+        <div class="network-card">
+          <div class="network-card-head"><span class="label mono">IPv6</span><span class="req-tag optional">Optional</span></div>
+          <div class="network-value mono" id="ipv6-value">pending</div>
+          <p>IPv6 is detected when available, but it is not required.</p>
+        </div>
+        <div class="network-card">
+          <div class="network-card-head"><span class="label mono">Region</span><span class="req-tag notice">Server</span></div>
+          <div class="network-value mono" id="region-value">pending</div>
+          <p>Region is classified by the Consensus server from IPv4.</p>
+        </div>
+      </section>
+
+      <section class="install-card" aria-labelledby="network-eval-title">
+        <div class="install-head">
+          <div>
+            <h2 id="network-eval-title">Secure-channel benchmark</h2>
+            <p id="eval-copy">The local client connects to Consensus over an encrypted channel. In local test flow this is simulated and only setup-progress.json is updated.</p>
+          </div>
+          <span class="env-status pending mono" id="eval-status">Waiting</span>
+        </div>
+        <div class="install-steps">
+          <div class="install-step" id="step-ipv4">
+            <span class="env-icon pending"><span class="estatic">-</span><span class="espin"></span></span>
+            <span class="step-text">Detect public IPv4<span class="step-sub mono">queued</span></span>
+          </div>
+          <div class="install-step" id="step-ipv6">
+            <span class="env-icon pending"><span class="estatic">-</span><span class="espin"></span></span>
+            <span class="step-text">Detect optional IPv6<span class="step-sub mono">queued</span></span>
+          </div>
+          <div class="install-step" id="step-region">
+            <span class="env-icon pending"><span class="estatic">-</span><span class="espin"></span></span>
+            <span class="step-text">Classify region<span class="step-sub mono">queued</span></span>
+          </div>
+          <div class="install-step" id="step-eval">
+            <span class="env-icon pending"><span class="estatic">-</span><span class="espin"></span></span>
+            <span class="step-text">Run benchmark over encrypted channel<span class="step-sub mono">queued</span></span>
+          </div>
+        </div>
+      </section>
+
+      <div class="connection-footer">
+        <div class="actions">
+          <button class="btn secondary" id="back" type="button">Back</button>
+          <button class="btn" id="run" type="button"><span class="spin"></span><span id="run-label">Run network check</span><span class="mono">-&gt;</span></button>
+          <button class="btn" id="continue" type="button" disabled><span class="spin"></span><span>Continue setup</span><span class="mono">-&gt;</span></button>
+          <span class="helper" id="helper">Ready to check network and benchmark status.</span>
+        </div>
+      </div>
+    </section>
+    <aside class="rail">
+      <div class="rail-head"><span class="rail-title mono">Local setup process</span><span class="rail-dot"></span></div>
+      <div class="rail-body">
+        <div class="rline ok"><span class="rmark">&#10003;</span><span class="rtxt">Operator agreement<span class="rsub mono">accepted</span></span></div>
+        <div class="rline ok"><span class="rmark">&#10003;</span><span class="rtxt">Runtime directory and tools<span class="rsub mono">environment ready</span></span></div>
+        <div class="rline ok"><span class="rmark">&#10003;</span><span class="rtxt">Runtime install<span class="rsub mono">runtime ready</span></span></div>
+        <div class="rline active"><span class="rmark">&rsaquo;</span><span class="rtxt">Network reachability and benchmark<span class="rsub mono" id="rail-current">waiting</span></span></div>
+        <div class="rline pending"><span class="rmark">&middot;</span><span class="rtxt">Registration and payout wallets</span></div>
+        <div class="rline pending"><span class="rmark">&middot;</span><span class="rtxt">Success and PM2</span></div>
+      </div>
+      <div class="rail-foot mono" id="state-dir"></div>
+    </aside>
+  </main>
+</div>
+<script>
+window.__CONSENSUS_SETUP_CONFIG__ = {{CONFIG_JSON}};
+{{CLIENT_SCRIPT}}
+</script>
+</body>
+</html>

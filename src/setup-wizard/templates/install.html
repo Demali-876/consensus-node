@@ -1,0 +1,121 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Consensus Node Setup · Runtime Install</title>
+<link rel="icon" type="image/svg+xml" href="{{FAVICON_URL}}">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+{{STYLES}}
+</style>
+</head>
+<body>
+<div class="page" style="--consensus-logo:url('{{LOGO_URL}}')">
+  <div class="grid-bg"></div>
+  <div class="mark"></div>
+  <header class="nav">
+    <div class="nav-inner">
+      <a href="#" class="brand" aria-label="Consensus"><img src="{{LOGO_URL}}" alt=""><span class="word">Consensus</span></a>
+      <span class="badge"><span class="dot"></span>Node sign-up</span>
+    </div>
+  </header>
+  <main class="shell">
+    <section class="main install-main">
+      <div class="eyebrow mono">Runtime install</div>
+      <div>
+        <h1>Install the approved node runtime</h1>
+        <p class="connection-copy">Consensus fetches the current approved release manifest, verifies the release artifact checksum, then installs it into the selected local runtime root.</p>
+      </div>
+      <div class="step-bars" aria-label="Setup progress">
+        <span class="step-bar done"></span>
+        <span class="step-bar done"></span>
+        <span class="step-bar active"></span>
+        <span class="step-bar"></span>
+        <span class="step-bar"></span>
+        <span class="step-bar"></span>
+      </div>
+
+      <section class="manifest-card" aria-labelledby="manifest-title">
+        <div class="manifest-head">
+          <div>
+            <h2 id="manifest-title">Approved release manifest</h2>
+            <p id="manifest-source">Fetching from consensus.canister.software...</p>
+          </div>
+          <span class="env-status pending mono" id="manifest-status">Fetching</span>
+        </div>
+        <div class="kv-grid" id="manifest-grid">
+          <div class="kv-row"><span class="kv-key mono">Version</span><span class="kv-value"><span class="skel w-sm"></span></span></div>
+          <div class="kv-row"><span class="kv-key mono">Platform</span><span class="kv-value"><span class="skel w-md"></span></span></div>
+          <div class="kv-row"><span class="kv-key mono">Commit</span><span class="kv-value"><span class="skel w-md"></span></span></div>
+          <div class="kv-row"><span class="kv-key mono">SHA-256</span><span class="kv-value"><span class="skel w-lg"></span></span></div>
+          <div class="kv-row"><span class="kv-key mono">Source</span><span class="kv-value"><span class="skel w-lg"></span></span></div>
+        </div>
+      </section>
+
+      <section class="reuse-card" id="reuse-card" hidden>
+        <span class="reuse-icon">&#8634;</span>
+        <div>
+          <h2>Existing runtime matches this release</h2>
+          <p id="reuse-copy">A matching runtime is already installed.</p>
+        </div>
+        <div class="segmented" role="group" aria-label="Runtime install mode">
+          <button class="on" id="reuse-mode" type="button">Reuse</button>
+          <button id="install-mode" type="button">Reinstall</button>
+        </div>
+      </section>
+
+      <section class="install-card" id="install-card" aria-labelledby="install-progress-title">
+        <div class="install-head">
+          <div>
+            <h2 id="install-progress-title">Install progress</h2>
+            <p id="install-progress-copy">Nothing is downloaded until you confirm.</p>
+          </div>
+          <span class="version mono install-root" id="install-root">{{INSTALL_DIR}}</span>
+        </div>
+        <div class="install-steps">
+          <div class="install-step" id="step-download">
+            <span class="env-icon pending"><span class="estatic">-</span><span class="espin"></span></span>
+            <span class="step-text">Download release artifact<span class="step-sub mono">queued</span></span>
+          </div>
+          <div class="install-step" id="step-verify">
+            <span class="env-icon pending"><span class="estatic">-</span><span class="espin"></span></span>
+            <span class="step-text">Verify checksum<span class="step-sub mono">queued</span></span>
+          </div>
+          <div class="install-step" id="step-install">
+            <span class="env-icon pending"><span class="estatic">-</span><span class="espin"></span></span>
+            <span class="step-text">Install runtime<span class="step-sub mono">queued</span></span>
+          </div>
+        </div>
+      </section>
+
+      <div class="connection-footer">
+        <div class="actions">
+          <button class="btn secondary" id="back" type="button">Back</button>
+          <button class="btn" id="continue" disabled><span class="spin"></span><span id="continue-label">Fetching manifest</span><span class="mono">-&gt;</span></button>
+          <span class="helper" id="helper">Waiting for approved manifest.</span>
+        </div>
+      </div>
+    </section>
+    <aside class="rail">
+      <div class="rail-head"><span class="rail-title mono">Local setup process</span><span class="rail-dot"></span></div>
+      <div class="rail-body">
+        <div class="rline ok"><span class="rmark">&#10003;</span><span class="rtxt">Operator agreement<span class="rsub mono">accepted</span></span></div>
+        <div class="rline ok"><span class="rmark">&#10003;</span><span class="rtxt">Runtime directory and tools<span class="rsub mono">environment ready</span></span></div>
+        <div class="rline active"><span class="rmark">&rsaquo;</span><span class="rtxt">Runtime install<span class="rsub mono" id="rail-current">fetching approved manifest</span></span></div>
+        <div class="rline pending"><span class="rmark">&middot;</span><span class="rtxt">Network reachability and benchmark</span></div>
+        <div class="rline pending"><span class="rmark">&middot;</span><span class="rtxt">Registration and payout wallets</span></div>
+        <div class="rline pending"><span class="rmark">&middot;</span><span class="rtxt">Success and PM2</span></div>
+      </div>
+      <div class="rail-foot mono" id="state-dir"></div>
+    </aside>
+  </main>
+</div>
+<script>
+window.__CONSENSUS_SETUP_CONFIG__ = {{CONFIG_JSON}};
+{{CLIENT_SCRIPT}}
+</script>
+</body>
+</html>

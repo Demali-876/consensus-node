@@ -1,0 +1,111 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Consensus Node Setup · Registration</title>
+<link rel="icon" type="image/svg+xml" href="{{FAVICON_URL}}">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+{{STYLES}}
+</style>
+</head>
+<body>
+<div class="page" style="--consensus-logo:url('{{LOGO_URL}}')">
+  <div class="grid-bg"></div>
+  <div class="mark"></div>
+  <header class="nav">
+    <div class="nav-inner">
+      <a href="#" class="brand" aria-label="Consensus"><img src="{{LOGO_URL}}" alt=""><span class="word">Consensus</span></a>
+      <span class="badge"><span class="dot"></span>Node sign-up</span>
+    </div>
+  </header>
+  <main class="shell">
+    <section class="main registration-main">
+      <div class="eyebrow mono">Registration</div>
+      <div>
+        <h1>Register this node</h1>
+        <p class="connection-copy">Verify a contact email, capture payout wallet addresses, confirm the node port, then submit the registration request.</p>
+      </div>
+      <div class="step-bars" aria-label="Setup progress">
+        <span class="step-bar done"></span>
+        <span class="step-bar done"></span>
+        <span class="step-bar done"></span>
+        <span class="step-bar done"></span>
+        <span class="step-bar active"></span>
+        <span class="step-bar"></span>
+      </div>
+
+      <section class="reg-grid">
+        <div class="reg-card">
+          <div class="reg-card-head"><h2>Contact email</h2><span class="env-status pending mono" id="email-pill">Pending</span></div>
+          <div class="inline-form">
+            <input id="email" class="dir-input mono" placeholder="you@example.com" autocomplete="email" spellcheck="false">
+            <button id="send-code" class="small-btn" type="button">Send code</button>
+          </div>
+          <div class="inline-form code-row" id="code-row" hidden>
+            <input id="code" class="dir-input mono" placeholder="Code" autocomplete="one-time-code" spellcheck="false">
+            <button id="verify-code" class="small-btn" type="button">Verify</button>
+          </div>
+          <p class="field-hint" id="email-helper">Used for node status and security notices.</p>
+        </div>
+
+        <div class="reg-card">
+          <div class="reg-card-head"><h2>Payout wallets</h2><span class="env-status pending mono" id="wallet-pill">0/3</span></div>
+          <div class="wallet-list">
+            <div class="wallet-row"><span>EVM</span><span class="mono" id="wallet-evm">not connected</span></div>
+            <div class="wallet-row"><span>Solana</span><span class="mono" id="wallet-solana">not connected</span></div>
+            <div class="wallet-row"><span>ICP</span><span class="mono" id="wallet-icp">not connected</span></div>
+          </div>
+          <button id="connect-wallets" class="small-btn wallet-btn" type="button">Connect wallets</button>
+          <p class="field-hint" id="wallet-helper">MetaMask, Phantom, and Plug are read from a local wallet page.</p>
+        </div>
+
+        <div class="reg-card">
+          <div class="reg-card-head"><h2>Node port</h2><span class="env-status ok mono">Default</span></div>
+          <input id="port" class="dir-input mono port-input" value="9090" spellcheck="false" autocomplete="off">
+          <p class="field-hint">Local port used by the node control process.</p>
+          <label class="pm2-check"><input id="start-pm2" type="checkbox" checked> Start PM2 control tunnel after registration</label>
+        </div>
+      </section>
+
+      <section class="review-card">
+        <div class="reg-card-head"><h2>Review</h2><span class="env-status pending mono" id="review-pill">Incomplete</span></div>
+        <div class="review-mini">
+          <div><span class="label mono">Contact</span><strong id="review-email">not verified</strong></div>
+          <div><span class="label mono">IPv4</span><strong id="review-ipv4">pending</strong></div>
+          <div><span class="label mono">Region</span><strong id="review-region">pending</strong></div>
+          <div><span class="label mono">Port</span><strong id="review-port">9090</strong></div>
+        </div>
+      </section>
+
+      <div class="connection-footer">
+        <div class="actions">
+          <button class="btn secondary" id="back" type="button">Back</button>
+          <button class="btn" id="submit" type="button" disabled><span class="spin"></span><span id="submit-label">Complete all steps</span><span class="mono">-&gt;</span></button>
+          <span class="helper" id="helper">Complete email, wallets, and port before registration.</span>
+        </div>
+      </div>
+    </section>
+    <aside class="rail">
+      <div class="rail-head"><span class="rail-title mono">Local setup process</span><span class="rail-dot"></span></div>
+      <div class="rail-body">
+        <div class="rline ok"><span class="rmark">&#10003;</span><span class="rtxt">Operator agreement<span class="rsub mono">accepted</span></span></div>
+        <div class="rline ok"><span class="rmark">&#10003;</span><span class="rtxt">Runtime directory and tools<span class="rsub mono">environment ready</span></span></div>
+        <div class="rline ok"><span class="rmark">&#10003;</span><span class="rtxt">Runtime install<span class="rsub mono">runtime ready</span></span></div>
+        <div class="rline ok"><span class="rmark">&#10003;</span><span class="rtxt">Network reachability and benchmark<span class="rsub mono">benchmark passed</span></span></div>
+        <div class="rline active"><span class="rmark">&rsaquo;</span><span class="rtxt">Registration and payout wallets<span class="rsub mono" id="rail-current">awaiting contact email</span></span></div>
+        <div class="rline pending"><span class="rmark">&middot;</span><span class="rtxt">Success and PM2</span></div>
+      </div>
+      <div class="rail-foot mono" id="state-dir"></div>
+    </aside>
+  </main>
+</div>
+<script>
+window.__CONSENSUS_SETUP_CONFIG__ = {{CONFIG_JSON}};
+{{CLIENT_SCRIPT}}
+</script>
+</body>
+</html>

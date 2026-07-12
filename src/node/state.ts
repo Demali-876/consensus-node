@@ -110,6 +110,10 @@ export interface SetupProgress {
   solanaAddress?: string;
   icpAddress?: string;
   port?: string;
+  operatorAgreementAccepted?: boolean;
+  operatorAgreementAcceptedAt?: string;
+  operatorAgreementSignature?: string;
+  operatorAgreementVersion?: string;
 }
 
 export async function loadSetupProgress(): Promise<SetupProgress> {

@@ -1,0 +1,108 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Consensus Node Setup</title>
+<link rel="icon" type="image/svg+xml" href="{{FAVICON_URL}}">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+{{STYLES}}
+</style>
+</head>
+<body>
+<div class="page" style="--consensus-logo:url('{{LOGO_URL}}')">
+  <div class="grid-bg"></div>
+  <div class="mark"></div>
+  <header class="nav">
+    <div class="nav-inner">
+      <a href="#" class="brand" aria-label="Consensus"><img src="{{LOGO_URL}}" alt=""><span class="word">Consensus</span></a>
+      <span class="badge"><span class="dot"></span>Node sign-up</span>
+    </div>
+  </header>
+  <main class="shell">
+    <section class="main">
+      <div class="eyebrow mono">Welcome</div>
+      <div>
+        <h1>Consensus Node Setup</h1>
+        <div class="intro">
+          <div class="copy">
+            <p>This machine is attempting to become a <strong>dedicated node</strong> in the Consensus network. The network provides proxy, WebSocket, and tunnel services, and this machine will be benchmarked for its ability to serve those requests.</p>
+            <p>If successful, it will be commissioned into the network and expected to remain available <strong>24/7</strong>. If it is not reliably available, it may be discarded from the network.</p>
+            <div class="creed mono"><span>I am</span><span>You are</span><span>We are Consensus</span></div>
+          </div>
+          <div class="req-panel">
+            <div class="req-row"><span class="req-icon req">&#10003;</span><span class="req-text">IPv4 connectivity<span class="rt-sub">Used to reach this node</span></span><span class="req-tag required">Required</span></div>
+            <div class="req-row"><span class="req-icon opt">-</span><span class="req-text">IPv6 connectivity<span class="rt-sub">Detected if available</span></span><span class="req-tag optional">Optional</span></div>
+            <div class="req-row"><span class="req-icon info">i</span><span class="req-text">Custom domain<span class="rt-sub">May be issued for this node</span></span><span class="req-tag notice">Auto</span></div>
+            <div class="req-row"><span class="req-icon info">i</span><span class="req-text">Public IP usage<span class="rt-sub">May serve network traffic</span></span><span class="req-tag notice">Network</span></div>
+            <div class="req-row"><span class="req-icon req">&#10003;</span><span class="req-text">24/7 availability<span class="rt-sub">Expected while commissioned</span></span><span class="req-tag required">Expected</span></div>
+          </div>
+        </div>
+      </div>
+      <section class="agreement" aria-labelledby="agreement-title">
+        <div class="agreement-head"><h2 id="agreement-title">Operator Agreement</h2><span class="version mono">{{AGREEMENT_VERSION}}</span></div>
+        <div class="review-gate" id="agreement-review-gate">
+          <div>
+            <p class="review-title">Review the Good-Faith Node Operator Agreement.</p>
+            <p class="review-copy">The agreement opens here in a focused popup. Scroll to the end and click agree to unlock the signature step.</p>
+            <div class="review-status mono" id="agreement-review-status">Required before signing</div>
+          </div>
+          <button class="review-action" id="review-agreement" type="button">Review agreement <span class="mono">-&gt;</span></button>
+        </div>
+        <div class="form">
+          <label class="check"><input id="agree-check" type="checkbox" disabled> <span>I have read and agree to the Good-Faith Node Operator Agreement.</span></label>
+          <label class="field"><span class="label mono">Electronic signature</span><input id="signature" autocomplete="name" placeholder="Type your full name or operator name"></label>
+          <label class="field"><span class="label mono">Typed confirmation</span><input id="confirmation" autocomplete="off" placeholder="I AGREE"></label>
+        </div>
+      </section>
+      <div>
+        <div class="actions">
+          <button class="btn" id="continue" disabled><span class="spin"></span><span id="continue-label">Continue setup</span><span class="mono">-&gt;</span></button>
+          <span class="helper" id="helper">Agreement will be recorded locally when you continue.</span>
+        </div>
+      </div>
+    </section>
+    <aside class="rail">
+      <div class="rail-head"><span class="rail-title mono">Local setup process</span><span class="rail-dot"></span></div>
+      <div class="rail-body">
+        <div class="rline active"><span class="rmark">&rsaquo;</span><span class="rtxt">Operator agreement<span class="rsub mono" id="progress-line">review and sign</span></span></div>
+        <div class="rline pending"><span class="rmark">&middot;</span><span class="rtxt">Runtime directory and tools</span></div>
+        <div class="rline pending"><span class="rmark">&middot;</span><span class="rtxt">Runtime install</span></div>
+        <div class="rline pending"><span class="rmark">&middot;</span><span class="rtxt">Network reachability and benchmark</span></div>
+        <div class="rline pending"><span class="rmark">&middot;</span><span class="rtxt">Registration and payout wallets</span></div>
+        <div class="rline pending"><span class="rmark">&middot;</span><span class="rtxt">Success and PM2</span></div>
+      </div>
+      <div class="rail-foot mono" id="state-dir"></div>
+    </aside>
+  </main>
+  <div class="modal" id="agreement-modal" role="dialog" aria-modal="true" aria-labelledby="agreement-modal-title" hidden>
+    <div class="modal-shell">
+      <div class="modal-head">
+        <div>
+          <h2 class="modal-title" id="agreement-modal-title">Good-Faith Node Operator Agreement</h2>
+          <p class="modal-sub">Scroll through the full agreement. The agree button unlocks at the bottom.</p>
+        </div>
+        <button class="modal-close" id="agreement-modal-close" type="button" aria-label="Close agreement">&times;</button>
+      </div>
+      <div class="modal-scroll" id="agreement-modal-scroll" tabindex="0">
+        <article class="agreement-doc">
+          {{AGREEMENT_CONTENT}}
+        </article>
+      </div>
+      <div class="modal-foot">
+        <div class="scroll-meter" aria-hidden="true"><div class="scroll-fill" id="agreement-scroll-fill"></div></div>
+        <span class="modal-note mono" id="agreement-scroll-note">Scroll to continue</span>
+        <button class="modal-agree" id="agreement-modal-agree" type="button" disabled>I have read and agree</button>
+      </div>
+    </div>
+  </div>
+</div>
+<script>
+window.__CONSENSUS_SETUP_CONFIG__ = {{CONFIG_JSON}};
+{{CLIENT_SCRIPT}}
+</script>
+</body>
+</html>
