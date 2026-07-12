@@ -5,6 +5,7 @@ import readline from "node:readline/promises";
 import { stdin as input, stdout as output } from "node:process";
 import { downloadAndVerify, fetchRequiredManifest } from "./update";
 import { loadConfig, loadJoinAuthorization, loadSetupProgress, saveSetupProgress, stateDir, type SetupProgress } from "./node/state";
+import { mergeWalletAddresses, openWalletAddressPage, startWalletAddressServer, validateWalletAddresses } from "./registration/wallet-capture";
 
 const DEFAULT_SERVER_URL = "https://consensus.canister.software";
 const DEFAULT_INSTALL_DIR = path.join(process.env.HOME ?? ".", ".consensus", "node-runtime");
@@ -95,6 +96,7 @@ async function main(): Promise<void> {
       });
 
     console.log("\nRegistration requires payout addresses.");
+    progress = await collectWalletAddresses(rl, progress);
     const evm = await requiredQuestion(rl, "EVM address", progress.evmAddress);
     progress = await remember(progress, { evmAddress: evm });
     const solana = await requiredQuestion(rl, "Solana address", progress.solanaAddress);
@@ -250,6 +252,68 @@ async function offerStartPm2(rl: readline.Interface, installDir: string, serverU
   console.log(`PM2 is managing ${appName}.`);
   console.log(`Logs: pm2 logs ${appName}`);
   console.log("For reboot persistence, run `pm2 startup`, follow its printed command, then run `pm2 save`.");
+}
+
+async function collectWalletAddresses(rl: readline.Interface, progress: SetupProgress): Promise<SetupProgress> {
+  console.log("A local browser page can connect MetaMask, Phantom, and Plug to read public wallet addresses.");
+  if (!await confirm(rl, "Use browser wallet connection?", true)) return progress;
+
+  const session = await startWalletAddressServer({
+    initialAddresses: {
+      evmAddress: progress.evmAddress,
+      solanaAddress: progress.solanaAddress,
+      icpAddress: progress.icpAddress,
+    },
+  });
+
+  console.log(`Wallet address page: ${session.url}`);
+  if (shouldOpenWalletAddressPage()) {
+    await openWalletAddressPage(session.url).catch((error) => {
+      console.warn(`Could not open browser automatically: ${error instanceof Error ? error.message : String(error)}`);
+    });
+  }
+
+  const abort = new AbortController();
+  const submitted = session.done.then((addresses) => {
+    abort.abort();
+    return { type: "submitted" as const, addresses };
+  });
+  const skipped = rl.question("Submit addresses in the browser, or press Enter here to type them manually: ", {
+    signal: abort.signal,
+  }).then(() => ({ type: "skipped" as const })).catch((error) => {
+    if (error instanceof Error && error.name === "AbortError") return { type: "aborted" as const };
+    throw error;
+  });
+
+  try {
+    const result = await Promise.race([submitted, skipped]);
+    if (result.type !== "submitted") return progress;
+
+    const addresses = mergeWalletAddresses({
+      evmAddress: progress.evmAddress,
+      solanaAddress: progress.solanaAddress,
+      icpAddress: progress.icpAddress,
+    }, result.addresses);
+    const errors = validateWalletAddresses(addresses);
+    if (Object.keys(errors).length > 0) {
+      console.warn("Browser wallet submission included invalid addresses; falling back to terminal prompts.");
+      for (const message of Object.values(errors)) console.warn(`  ${message}`);
+      return progress;
+    }
+
+    console.log("Wallet addresses received from browser.");
+    return await remember(progress, {
+      evmAddress: addresses.evmAddress,
+      solanaAddress: addresses.solanaAddress,
+      icpAddress: addresses.icpAddress,
+    });
+  } finally {
+    await session.stop().catch(() => {});
+  }
+}
+
+function shouldOpenWalletAddressPage(): boolean {
+  return process.env.CONSENSUS_WALLET_CAPTURE_OPEN?.trim() !== "0";
 }
 
 async function pathExists(target: string): Promise<boolean> {
