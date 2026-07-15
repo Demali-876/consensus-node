@@ -77,6 +77,14 @@ CONSENSUS_ICP_ADDRESS=... \
 bun run register
 ```
 
+The interactive setup flow can collect these public payout addresses from
+MetaMask, Phantom, and Plug with a local browser page. To test that page without
+running the full setup flow:
+
+```bash
+bun run wallet:addresses
+```
+
 After registration, keep the outbound control tunnel open:
 
 ```bash

@@ -101,9 +101,11 @@ Answer the prompts in this order:
 10. `Contact email` - enter the email address for this node.
 11. Check that inbox for the verification code.
 12. `Email verification code` - enter the code from the email.
-13. `EVM address` - enter the EVM payout address.
-14. `Solana address` - enter the Solana payout address.
-15. `ICP address` - enter the ICP payout address.
+13. `Use browser wallet connection?` - enter `y` to open a local wallet page.
+14. In the browser, connect MetaMask, Phantom, and Plug, then submit the public
+    addresses back to setup.
+15. If a wallet is unavailable, press Enter in the terminal and type any missing
+    address manually.
 16. `Node local port` - press Enter to use `9090`, unless you need another local
     operator port.
 17. Wait while setup submits registration to `/node/join`.
