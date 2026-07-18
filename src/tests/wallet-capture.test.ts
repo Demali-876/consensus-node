@@ -60,6 +60,9 @@ try {
   assert.equal(html.includes("Connect MetaMask"), true);
   assert.equal(html.includes("Connect Phantom"), true);
   assert.equal(html.includes("Connect Plug"), true);
+  assert.equal(html.includes("Paste addresses"), true);
+  assert.equal(html.includes("Use address"), true);
+  assert.equal(html.includes("paste its public address instead"), true);
   assert.equal(html.includes("consensus-logo-light.svg"), true);
   assert.equal(html.includes("phantom.svg"), true);
   assert.equal(html.includes("plug.jpeg"), true);

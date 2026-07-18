@@ -375,7 +375,7 @@ function renderConsensusWalletAddressHtml(input: {
   html{scroll-behavior:smooth}
   body{margin:0;background:#000;color:#fff;font-family:"Space Grotesk",Inter,ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;-webkit-font-smoothing:antialiased;text-rendering:optimizeLegibility;min-height:100vh}
   ::selection{background:rgba(255,255,255,0.16)}
-  button{font:inherit}
+  button,input{font:inherit}
   @keyframes cs-pulse{0%{box-shadow:0 0 0 0 rgba(2,113,235,0.55)}70%{box-shadow:0 0 0 7px rgba(2,113,235,0)}100%{box-shadow:0 0 0 0 rgba(2,113,235,0)}}
   @keyframes cs-spin{to{transform:rotate(360deg)}}
   @keyframes cs-in{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:none}}
@@ -426,6 +426,7 @@ function renderConsensusWalletAddressHtml(input: {
   .addr-box .atext{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
   .addr-box .copy{background:transparent;border:0;color:rgba(255,255,255,0.4);cursor:pointer;padding:2px;flex:none;transition:color .15s ease}
   .addr-box .copy:hover{color:#fff}
+  .wallet-actions{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:8px}
   .btn-connect{width:100%;min-width:0;font-family:inherit;font-size:14.5px;font-weight:600;border:0;border-radius:10px;padding:12px 18px;cursor:pointer;color:#000;background:#fff;display:inline-flex;align-items:center;justify-content:center;gap:9px;transition:transform .15s ease,box-shadow .15s ease,background .15s ease,color .15s ease}
   .btn-connect:hover{transform:translateY(-1px);box-shadow:0 10px 30px rgba(255,255,255,0.12)}
   .btn-connect.connected{background:rgba(46,204,143,0.12);color:#2ecc8f;border:1px solid rgba(46,204,143,0.35)}
@@ -433,6 +434,15 @@ function renderConsensusWalletAddressHtml(input: {
   .btn-connect.busy{opacity:0.6;cursor:wait}
   .btn-connect .spin{width:13px;height:13px;border-radius:50%;border:2px solid rgba(0,0,0,0.25);border-top-color:#000;animation:cs-spin .7s linear infinite;display:none}
   .btn-connect.busy .spin{display:inline-block}
+  .btn-manual{border:1px solid rgba(255,255,255,0.14);border-radius:10px;padding:11px 14px;background:rgba(255,255,255,0.025);color:rgba(255,255,255,0.72);font-size:13px;font-weight:500;cursor:pointer;transition:border-color .15s ease,color .15s ease,background .15s ease}
+  .btn-manual:hover,.btn-manual[aria-expanded="true"]{border-color:rgba(255,255,255,0.34);color:#fff;background:rgba(255,255,255,0.06)}
+  .manual-entry{display:none;grid-template-columns:minmax(0,1fr) auto;gap:8px}
+  .manual-entry.show{display:grid}
+  .manual-input{min-width:0;width:100%;border:1px solid rgba(255,255,255,0.16);border-radius:10px;background:#0a0a0b;color:#fff;padding:10px 12px;font-family:"JetBrains Mono","SFMono-Regular",Consolas,ui-monospace,monospace;font-size:12px;outline:none}
+  .manual-input::placeholder{color:rgba(255,255,255,0.28)}
+  .manual-input:focus{border-color:rgba(2,113,235,0.75);box-shadow:0 0 0 3px rgba(2,113,235,0.12)}
+  .manual-save{border:1px solid rgba(255,255,255,0.18);border-radius:10px;background:rgba(255,255,255,0.08);color:#fff;padding:10px 13px;font-size:12.5px;font-weight:600;cursor:pointer;white-space:nowrap}
+  .manual-save:hover{background:rgba(255,255,255,0.13)}
   .status-line{display:flex;align-items:center;gap:8px;font-size:12.5px;min-height:16px}
   .status-line.ok{color:#2ecc8f}
   .status-line.err{color:#ff6b6b}
@@ -481,9 +491,9 @@ function renderConsensusWalletAddressHtml(input: {
     <div class="toprow">
       <div>
         <h1>Connect your payout wallets</h1>
-        <p class="sub">Link <span class="em">MetaMask</span>, <span class="em">Phantom</span>, and <span class="em">Plug</span> so we know where to send your earnings. Addresses are read directly from each wallet extension.</p>
+        <p class="sub">Link <span class="em">MetaMask</span>, <span class="em">Phantom</span>, and <span class="em">Plug</span> so we know where to send your earnings. Connect each extension or paste its public payout address.</p>
       </div>
-      <button type="button" class="steplink mono" id="skip-link">Return to terminal</button>
+      <button type="button" class="steplink mono" id="manual-all">Paste addresses</button>
     </div>
     <div class="tabs" id="tabs">
       <button class="tab on" type="button" data-tab="all"><span class="tdot"></span>All wallets</button>
@@ -496,19 +506,22 @@ function renderConsensusWalletAddressHtml(input: {
       <div class="card" id="card-evm" data-card="evm">
         <div class="card-head"><span class="wicon evm">${metaMaskIcon()}</span><div><h3 class="card-title">MetaMask</h3><p class="card-desc">EVM payout address · Base, Ethereum</p></div></div>
         <div class="field"><span class="field-label">EVM address</span><div class="addr-box" id="addr-evm"><span class="atext">not connected</span></div></div>
-        <button class="btn-connect" type="button" id="btn-evm"><span class="spin"></span><span class="blabel">Connect MetaMask</span></button>
+        <div class="wallet-actions"><button class="btn-connect" type="button" id="btn-evm"><span class="spin"></span><span class="blabel">Connect MetaMask</span></button><button class="btn-manual" type="button" id="manual-evm" aria-expanded="false" aria-controls="entry-evm">Paste</button></div>
+        <div class="manual-entry" id="entry-evm"><input class="manual-input" id="input-evm" type="text" inputmode="text" autocomplete="off" spellcheck="false" placeholder="0x..." aria-label="EVM payout address"><button class="manual-save" id="save-evm" type="button">Use address</button></div>
         <div class="status-line idle" id="status-evm"><span class="sdot"></span><span class="stext">Waiting to connect</span></div>
       </div>
       <div class="card" id="card-sol" data-card="sol">
         <div class="card-head"><span class="wicon sol">${phantomMark}</span><div><h3 class="card-title">Phantom</h3><p class="card-desc">Solana payout address · Devnet, Mainnet</p></div></div>
         <div class="field"><span class="field-label">Solana address</span><div class="addr-box" id="addr-sol"><span class="atext">not connected</span></div></div>
-        <button class="btn-connect" type="button" id="btn-sol"><span class="spin"></span><span class="blabel">Connect Phantom</span></button>
+        <div class="wallet-actions"><button class="btn-connect" type="button" id="btn-sol"><span class="spin"></span><span class="blabel">Connect Phantom</span></button><button class="btn-manual" type="button" id="manual-sol" aria-expanded="false" aria-controls="entry-sol">Paste</button></div>
+        <div class="manual-entry" id="entry-sol"><input class="manual-input" id="input-sol" type="text" inputmode="text" autocomplete="off" spellcheck="false" placeholder="Solana public key" aria-label="Solana payout address"><button class="manual-save" id="save-sol" type="button">Use address</button></div>
         <div class="status-line idle" id="status-sol"><span class="sdot"></span><span class="stext">Waiting to connect</span></div>
       </div>
       <div class="card" id="card-icp" data-card="icp">
         <div class="card-head"><span class="wicon icp">${plugMark}</span><div><h3 class="card-title">Plug</h3><p class="card-desc">ICP principal · node registry &amp; ckUSDC</p></div></div>
         <div class="field"><span class="field-label">ICP principal</span><div class="addr-box" id="addr-icp"><span class="atext">not connected</span></div></div>
-        <button class="btn-connect" type="button" id="btn-icp"><span class="spin"></span><span class="blabel">Connect Plug</span></button>
+        <div class="wallet-actions"><button class="btn-connect" type="button" id="btn-icp"><span class="spin"></span><span class="blabel">Connect Plug</span></button><button class="btn-manual" type="button" id="manual-icp" aria-expanded="false" aria-controls="entry-icp">Paste</button></div>
+        <div class="manual-entry" id="entry-icp"><input class="manual-input" id="input-icp" type="text" inputmode="text" autocomplete="off" spellcheck="false" placeholder="aaaaa-aa" aria-label="ICP principal"><button class="manual-save" id="save-icp" type="button">Use address</button></div>
         <div class="status-line idle" id="status-icp"><span class="sdot"></span><span class="stext">Waiting to connect</span></div>
       </div>
     </div>
@@ -516,7 +529,7 @@ function renderConsensusWalletAddressHtml(input: {
       <div class="review-row"><span class="rk"><span class="ricon" style="background:#f6851b33;border:1px solid #f6851b40">${metaMaskIcon()}</span>MetaMask</span><span class="rv missing" id="rv-evm">not connected</span><span class="rstat no" id="rs-evm">pending</span></div>
       <div class="review-row"><span class="rk"><span class="ricon" style="background:#ab9ff233;border:1px solid #ab9ff240">${phantomMark}</span>Phantom</span><span class="rv missing" id="rv-sol">not connected</span><span class="rstat no" id="rs-sol">pending</span></div>
       <div class="review-row"><span class="rk"><span class="ricon icp" style="background:#0271EB33;border:1px solid #0271EB40">${plugMark}</span>Plug</span><span class="rv missing" id="rv-icp">not connected</span><span class="rstat no" id="rs-icp">pending</span></div>
-      <div class="review-actions"><span class="review-note" id="review-note">All three wallets must be connected before you can continue to node registration.</span><button class="btn-continue" type="button" id="btn-continue" disabled>Continue to node setup <span class="mono">-&gt;</span></button></div>
+      <div class="review-actions"><span class="review-note" id="review-note">All three payout addresses must be provided before you can continue to node registration.</span><button class="btn-continue" type="button" id="btn-continue" disabled>Continue to node setup <span class="mono">-&gt;</span></button></div>
     </div>
   </main>
 </div>
@@ -526,9 +539,9 @@ function renderConsensusWalletAddressHtml(input: {
   const config = ${config};
   const $ = (id) => document.getElementById(id);
   const state = {
-    evm: config.initialAddresses.evmAddress ? { address: config.initialAddresses.evmAddress } : null,
-    sol: config.initialAddresses.solanaAddress ? { address: config.initialAddresses.solanaAddress } : null,
-    icp: config.initialAddresses.icpAddress ? { principal: config.initialAddresses.icpAddress } : null,
+    evm: config.initialAddresses.evmAddress ? { address: config.initialAddresses.evmAddress, source: "saved" } : null,
+    sol: config.initialAddresses.solanaAddress ? { address: config.initialAddresses.solanaAddress, source: "saved" } : null,
+    icp: config.initialAddresses.icpAddress ? { principal: config.initialAddresses.icpAddress, source: "saved" } : null,
   };
   let autoReviewed = false;
   const announcedProviders = [];
@@ -554,9 +567,57 @@ function renderConsensusWalletAddressHtml(input: {
   function copyText(value, label) {
     navigator.clipboard?.writeText(value).then(() => toast("Copied " + label + " address")).catch(() => toast("Copy unavailable"));
   }
+  function addressFor(key) {
+    return key === "icp" ? state[key]?.principal : state[key]?.address;
+  }
+  function setAddress(key, value, source) {
+    state[key] = key === "icp" ? { principal: value, source } : { address: value, source };
+  }
+  function manualValidationError(key, value) {
+    if (key === "evm" && !/^0x[a-fA-F0-9]{40}$/.test(value)) return "EVM address must be 0x followed by 40 hex characters";
+    if (key === "sol" && !/^[1-9A-HJ-NP-Za-km-z]{32,44}$/.test(value)) return "Solana address must be a base58 public key";
+    if (key === "icp" && !/^[a-z0-9]{1,5}(?:-[a-z0-9]{1,5})+$/.test(value)) return "ICP address must be a textual principal";
+    return "";
+  }
+  function showManualEntry(key, focus = true) {
+    const entry = $("entry-" + key);
+    const button = $("manual-" + key);
+    entry.classList.add("show");
+    button.setAttribute("aria-expanded", "true");
+    const input = $("input-" + key);
+    input.value = addressFor(key) || input.value;
+    if (focus) input.focus();
+  }
+  function toggleManualEntry(key) {
+    const entry = $("entry-" + key);
+    const open = !entry.classList.contains("show");
+    entry.classList.toggle("show", open);
+    $("manual-" + key).setAttribute("aria-expanded", String(open));
+    if (open) {
+      const input = $("input-" + key);
+      input.value = addressFor(key) || input.value;
+      input.focus();
+    }
+  }
+  function saveManualAddress(key) {
+    const value = $("input-" + key).value.trim();
+    const error = manualValidationError(key, value);
+    if (error) {
+      const status = $("status-" + key);
+      status.className = "status-line err";
+      status.querySelector(".stext").textContent = error;
+      toast(error);
+      return;
+    }
+    setAddress(key, value, "manual");
+    $("entry-" + key).classList.remove("show");
+    $("manual-" + key).setAttribute("aria-expanded", "false");
+    renderAll();
+    toast("Public address added");
+  }
   function renderWallet(key, label) {
     const data = state[key];
-    const display = key === "icp" ? data?.principal : data?.address;
+    const display = addressFor(key);
     const addrBox = $("addr-" + key);
     const btn = $("btn-" + key);
     const status = $("status-" + key);
@@ -568,10 +629,10 @@ function renderConsensusWalletAddressHtml(input: {
       addrBox.querySelector(".atext").textContent = display;
       addrBox.querySelector(".atext").title = display;
       addrBox.querySelector(".copy").addEventListener("click", () => copyText(display, label));
-      btn.classList.add("connected");
-      btn.querySelector(".blabel").textContent = "Connected · reconnect";
+      btn.classList.toggle("connected", data.source === "wallet");
+      btn.querySelector(".blabel").textContent = data.source === "wallet" ? "Connected · reconnect" : "Connect " + label;
       status.className = "status-line ok";
-      status.querySelector(".stext").textContent = "Connected " + short(display);
+      status.querySelector(".stext").textContent = data.source === "wallet" ? "Connected " + short(display) : "Address added " + short(display);
       card.classList.add("connected");
       if (tab) tab.classList.add("done");
     } else {
@@ -593,7 +654,7 @@ function renderConsensusWalletAddressHtml(input: {
       if (val) {
         rv.textContent = val;
         rv.classList.remove("missing");
-        rs.textContent = "connected";
+        rs.textContent = state[key]?.source === "wallet" ? "connected" : "provided";
         rs.className = "rstat ok";
       } else {
         rv.textContent = "not connected";
@@ -602,7 +663,7 @@ function renderConsensusWalletAddressHtml(input: {
         rs.className = "rstat no";
       }
     });
-    $("btn-continue").disabled = !(state.evm && state.sol && state.icp);
+    $("btn-continue").disabled = !allProvided();
   }
   function renderAll() {
     renderWallet("evm", "MetaMask");
@@ -611,7 +672,7 @@ function renderConsensusWalletAddressHtml(input: {
     renderReview();
     maybeAutoReview();
   }
-  function allConnected() {
+  function allProvided() {
     return Boolean(state.evm && state.sol && state.icp);
   }
   function isMetaMaskAnnouncement(entry) {
@@ -637,16 +698,17 @@ function renderConsensusWalletAddressHtml(input: {
   async function connectEvm() {
     const provider = await getMetaMaskProvider();
     if (!provider?.request) {
-      toast("MetaMask not detected");
+      toast("MetaMask not detected - paste its public address instead");
       $("status-evm").className = "status-line err";
-      $("status-evm").querySelector(".stext").textContent = "MetaMask provider not found";
+      $("status-evm").querySelector(".stext").textContent = "MetaMask not found - paste the public address";
+      showManualEntry("evm");
       return;
     }
     setBusy("evm", true);
     try {
       const accounts = await provider.request({ method: "eth_requestAccounts" });
       if (accounts && accounts[0]) {
-        state.evm = { address: accounts[0] };
+        state.evm = { address: accounts[0], source: "wallet" };
         renderAll();
         toast("MetaMask connected");
       }
@@ -659,9 +721,10 @@ function renderConsensusWalletAddressHtml(input: {
   async function connectSol() {
     const provider = window.phantom?.solana || (window.solana?.isPhantom ? window.solana : null);
     if (!provider) {
-      toast("Phantom not detected");
+      toast("Phantom not detected - paste its public address instead");
       $("status-sol").className = "status-line err";
-      $("status-sol").querySelector(".stext").textContent = "Phantom extension not found";
+      $("status-sol").querySelector(".stext").textContent = "Phantom not found - paste the public address";
+      showManualEntry("sol");
       return;
     }
     setBusy("sol", true);
@@ -669,7 +732,7 @@ function renderConsensusWalletAddressHtml(input: {
       const response = await provider.connect();
       const address = response?.publicKey?.toString?.() || provider.publicKey?.toString?.();
       if (address) {
-        state.sol = { address };
+        state.sol = { address, source: "wallet" };
         renderAll();
         toast("Phantom connected");
       }
@@ -682,9 +745,10 @@ function renderConsensusWalletAddressHtml(input: {
   async function connectIcp() {
     const plug = window.ic?.plug;
     if (!plug?.requestConnect) {
-      toast("Plug not detected");
+      toast("Plug not detected - paste its public address instead");
       $("status-icp").className = "status-line err";
-      $("status-icp").querySelector(".stext").textContent = "Plug extension not found";
+      $("status-icp").querySelector(".stext").textContent = "Plug not found - paste the public principal";
+      showManualEntry("icp");
       return;
     }
     setBusy("icp", true);
@@ -694,7 +758,7 @@ function renderConsensusWalletAddressHtml(input: {
       const agentPrincipal = await plug.agent?.getPrincipal?.();
       const principal = agentPrincipal?.toText?.() || agentPrincipal?.toString?.() || plug.principalId;
       if (!principal) throw new Error("Plug did not return a principal.");
-      state.icp = { principal };
+      state.icp = { principal, source: "wallet" };
       renderAll();
       toast("Plug connected");
     } catch (error) {
@@ -736,8 +800,20 @@ function renderConsensusWalletAddressHtml(input: {
   $("btn-evm").addEventListener("click", connectEvm);
   $("btn-sol").addEventListener("click", connectSol);
   $("btn-icp").addEventListener("click", connectIcp);
+  ["evm", "sol", "icp"].forEach((key) => {
+    $("manual-" + key).addEventListener("click", () => toggleManualEntry(key));
+    $("save-" + key).addEventListener("click", () => saveManualAddress(key));
+    $("input-" + key).addEventListener("keydown", (event) => {
+      if (event.key === "Enter") saveManualAddress(key);
+    });
+  });
   $("btn-continue").addEventListener("click", submitAddresses);
-  $("skip-link").addEventListener("click", () => toast("Press Enter in the terminal to type addresses manually"));
+  $("manual-all").addEventListener("click", () => {
+    showTab("all");
+    ["evm", "sol", "icp"].forEach((key) => showManualEntry(key, false));
+    const firstMissing = ["evm", "sol", "icp"].find((key) => !addressFor(key));
+    $("input-" + (firstMissing || "evm")).focus();
+  });
   const cardsPane = $("cards-pane");
   const reviewPane = $("review-pane");
   function showTab(which) {
@@ -754,7 +830,7 @@ function renderConsensusWalletAddressHtml(input: {
     });
   }
   function maybeAutoReview() {
-    if (!allConnected() || autoReviewed) return;
+    if (!allProvided() || autoReviewed) return;
     autoReviewed = true;
     setTimeout(() => showTab("review"), 250);
   }
