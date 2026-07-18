@@ -83,8 +83,8 @@ function buildHopByHopDenySet(headers: Record<string, string>): Set<string> {
 // target. On the direct data plane the client supplies the request headers and
 // the node serves them against the client's chosen upstream, so these are
 // stripped node-side as defense-in-depth — the orchestrator (relayed path) and
-// the consensus-client both strip them too. Notably this keeps `x-api-key` (the
-// caller's orchestrator scoping credential) from leaking upstream.
+// the consensus-client both strip them too. The deprecated `x-api-key` remains
+// only as a denylist entry and has no identity, routing, or cache semantics.
 //
 // Source of truth: STRIP_REQUEST_HEADERS in the consensus repo
 // (server/features/proxy/proxy.ts). This mirrors that list with ONE deliberate

@@ -13,7 +13,7 @@ const NODE = "node-1";
 const request: DedupeParams = {
   target_url: "https://api.example.com/v1/data?b=2&a=1",
   method: "GET",
-  headers: { "content-type": "application/json", "x-api-key": "secret" },
+  headers: { "content-type": "application/json" },
 };
 const dedupeKey = generateDedupeKey(request);
 const otherRequest: DedupeParams = { ...request, target_url: "https://api.example.com/v1/OTHER" };
