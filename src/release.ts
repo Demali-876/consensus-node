@@ -112,6 +112,9 @@ function parseBoolean(value: string): boolean {
 
 async function stagePackage(stageDir: string, release: { version: string; commit: string; platform: string }): Promise<void> {
   await fs.mkdir(stageDir, { recursive: true });
+  // fs.cp throws ENOENT on a missing source, so every entry here must exist in the
+  // repo. `src` carries supervise.ts and `launchd` the daemon template (mode 0755 is
+  // preserved, which the systemd unit's shebang ExecStart depends on).
   for (const entry of ["src", "bin", "scripts", "launchd", "systemd", "ecosystem.config.cjs", "package.json", "tsconfig.json", "bun.lock", "README.md"]) {
     await fs.cp(path.join(rootDir, entry), path.join(stageDir, entry), {
       recursive: true,

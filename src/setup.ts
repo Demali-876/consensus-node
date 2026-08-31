@@ -277,7 +277,15 @@ async function offerStartPm2(rl: readline.Interface, installDir: string, serverU
 
   console.log(`PM2 is managing ${appName}.`);
   console.log(`Logs: pm2 logs ${appName}`);
-  console.log("For reboot persistence, run `pm2 startup`, follow its printed command, then run `pm2 save`.");
+  // Deliberately NOT `pm2 startup`: on macOS that writes a LaunchAgent, which only
+  // loads once a user logs in, so the node stays down after an unattended reboot.
+  if (process.platform === "darwin") {
+    const installer = path.join(installDir, "current", "scripts", "install-launchd.sh");
+    console.log(`For boot persistence without login, run: sudo ${installer}`);
+  } else {
+    const unit = path.join(installDir, "current", "systemd", "consensus-node.service");
+    console.log(`For boot persistence, install the systemd unit: ${unit}`);
+  }
 }
 
 async function collectWalletAddresses(rl: readline.Interface, progress: SetupProgress): Promise<SetupProgress> {
