@@ -50,6 +50,8 @@
     "test:request-ticket": "bun src/tests/request-ticket.test.ts",
     "test:proxy-serve": "bun src/tests/proxy-serve.test.ts",
     "test:supervise": "bun src/tests/supervise.test.ts",
+    "test:secret-store": "bun src/tests/secret-store.test.ts",
+    "secrets:check": "bun src/secrets-check.ts",
     "test:data-plane": "bun src/tests/data-plane.test.ts",
     "test:data-plane-stream": "bun src/tests/data-plane-stream.test.ts",
     "gen:responder-auth-vectors": "bun src/tunnel/gen-responder-auth-vectors.ts",

@@ -8,6 +8,15 @@ import {
 import { MESSAGE_TYPE, decodeMessage } from "../tunnel/messages";
 import { openFrame, type SecureSession } from "../crypto/secure-channel";
 import { startEvalClient } from "../clients/eval-client";
+import crypto from "node:crypto";
+import fs from "node:fs/promises";
+import os from "node:os";
+import path from "node:path";
+
+// startEvalClient loads the node identity; keep that off the operator's real state.
+const stateRoot = await fs.mkdtemp(path.join(os.tmpdir(), "consensus-eval-client-"));
+process.env.CONSENSUS_STATE_DIR = stateRoot;
+process.env.CONSENSUS_NODE_SECRET_KEY = crypto.randomBytes(32).toString("base64");
 
 const state: { serverSession?: SecureSession } = {};
 let helloSeenResolve: (() => void) | null = null;
@@ -76,3 +85,5 @@ async function getFreePort(): Promise<number> {
     });
   });
 }
+
+await fs.rm(stateRoot, { recursive: true, force: true });

@@ -2,6 +2,7 @@ import fs from "node:fs/promises";
 import path from "node:path";
 import os from "node:os";
 import type { NodeConfig } from "../types";
+import { readSecretFile, writeSecretFile, SLOT_JOIN_AUTH } from "./secret-store";
 
 export interface StatePaths {
   base: string;
@@ -83,12 +84,20 @@ export interface JoinAuthorization {
 
 export async function saveJoinAuthorization(auth: JoinAuthorization): Promise<void> {
   const p = await ensureState();
-  await fs.writeFile(p.joinAuth, JSON.stringify(auth, null, 2), { encoding: "utf8", mode: 0o600 });
+  await writeSecretFile(SLOT_JOIN_AUTH, p.joinAuth, JSON.stringify(auth, null, 2));
 }
 
 export async function loadJoinAuthorization(): Promise<JoinAuthorization | null> {
   const p = await ensureState();
-  return readJson<JoinAuthorization | null>(p.joinAuth, null);
+  const raw = await readSecretFile(SLOT_JOIN_AUTH, p.joinAuth);
+  if (raw === null) return null;
+  try {
+    return JSON.parse(raw) as JoinAuthorization;
+  } catch {
+    // Matches the previous readJson() contract: a corrupt authorization is treated
+    // as absent, so the node re-runs eval rather than refusing to start.
+    return null;
+  }
 }
 
 export interface SetupProgress {

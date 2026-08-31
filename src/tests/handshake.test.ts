@@ -10,6 +10,15 @@ import {
   verifyClientHandshake,
 } from "../tunnel/handshake";
 import { TUNNEL_MODE } from "../tunnel/messages";
+import fs from "node:fs/promises";
+import os from "node:os";
+import path from "node:path";
+
+// Redirect state BEFORE creating an identity. Without this the test writes to the
+// operator's real ~/.consensus/node and rewrites live node key material.
+const stateRoot = await fs.mkdtemp(path.join(os.tmpdir(), "consensus-handshake-"));
+process.env.CONSENSUS_STATE_DIR = stateRoot;
+process.env.CONSENSUS_NODE_SECRET_KEY = crypto.randomBytes(32).toString("base64");
 
 const identity = await loadOrCreateIdentity();
 
@@ -64,3 +73,5 @@ assert.ok(unsignedError instanceof Error);
 assert.match(unsignedError.message, /signature is required/);
 
 console.log("handshake ok");
+
+await fs.rm(stateRoot, { recursive: true, force: true });
