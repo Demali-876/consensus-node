@@ -140,10 +140,10 @@ pm2 logs consensus-node-control
 The PM2 unit runs:
 
 ```txt
-~/.consensus/node-runtime/current/scripts/run-node.sh
+~/.consensus/node-runtime/current/src/supervise.ts
 ```
 
-That script starts both:
+That unit starts both:
 
 1. `bun run start` - local runtime server on `127.0.0.1:9090` by default.
 2. `bun run control` - outbound encrypted control tunnel to the Consensus server.

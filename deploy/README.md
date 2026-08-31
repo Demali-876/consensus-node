@@ -18,16 +18,16 @@ DNS pointed at the node's own IP). Those files (`deploy/Caddyfile`,
 
 ## What runs
 
-- **`scripts/run-node.sh`** — one supervised unit running **both** the control
+- **`src/supervise.ts`** — one supervised unit running **both** the control
   tunnel (`bun run control`, which now also serves the data plane over its
   streams) and the runtime server (`bun run start`). The runtime server binds
   **loopback-only** by default (`NODE_HOST=127.0.0.1`) and just exposes local
   operator endpoints (`/health`, `/node/*`); it is not reachable from outside and
   does not need to be. A single restart refreshes both children from the updated
   `current` symlink, and the unit cycles if either exits (so `update_apply`
-  restarts cleanly). `ecosystem.config.cjs`, `systemd/`, and `launchd/` all exec
-  it. Requires bash ≥ 4.3 (`wait -n`) — standard on Linux; on macOS run
-  `brew install bash`.
+  restarts cleanly). `ecosystem.config.cjs` and `systemd/` both exec it. Runs on
+  bun with no shell dependency — it replaced `scripts/run-node.sh`, which needed
+  bash ≥ 4.3 for `wait -n` and so failed on stock macOS (bash 3.2).
 
 ## Bring-up (per node)
 
