@@ -42,6 +42,7 @@
     "test:ssrf": "bun src/tests/ssrf.test.ts",
     "test:tickets": "bun src/tests/tickets.test.ts",
     "test:dedupe": "bun src/tests/dedupe.test.ts",
+    "test:profile-v1": "bun src/tests/profile-v1.test.ts",
     "test:pin": "bun src/tests/pin.test.ts",
     "test:responder-auth": "bun src/tests/responder-auth.test.ts",
     "test:data-handshake": "bun src/tests/data-handshake.test.ts",

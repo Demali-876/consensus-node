@@ -1,22 +1,17 @@
 import type { ProxyRequestMessage, ProxyResponseMessage } from "../tunnel/messages";
 import { MESSAGE_TYPE, nowSeconds } from "../tunnel/messages";
+import { serveProxyRequest } from "./proxy-serve";
 
 export async function executeProxyCommand(message: ProxyRequestMessage): Promise<ProxyResponseMessage> {
   const method = (message.method || "GET").toUpperCase();
-  const start = performance.now();
   const body = decodeBody(message.body, message.body_encoding);
-
-  const response = await fetch(message.target_url, {
+  const response = await serveProxyRequest({
+    target_url: message.target_url,
     method,
-    headers: {
-      ...(message.headers || {}),
-      "user-agent": "Consensus-Node/0.1",
-    },
-    body: method === "GET" || method === "HEAD" ? undefined : body,
-    signal: AbortSignal.timeout(30_000),
+    headers: message.headers,
+    body,
+    profile: message.profile,
   });
-
-  const responseBody = Buffer.from(await response.arrayBuffer());
 
   return {
     type: MESSAGE_TYPE.PROXY_RESPONSE,
@@ -24,9 +19,11 @@ export async function executeProxyCommand(message: ProxyRequestMessage): Promise
     reply_to: message.id ?? "",
     status: response.status,
     status_text: response.statusText,
-    headers: Object.fromEntries(response.headers.entries()),
-    body: responseBody.toString("base64"),
+    headers: response.headers,
+    body: response.body.toString("base64"),
     body_encoding: "base64",
+    cached: response.cached,
+    profile_hash: response.profile_hash,
   };
 }
 

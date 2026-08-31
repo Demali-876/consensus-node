@@ -6,7 +6,8 @@ import os from "node:os";
 import path from "node:path";
 import zlib from "node:zlib";
 
-import { serveProxyRequest, type SsrfCheck } from "../runtime/proxy-serve";
+import { clearProxyProfileCache, serveProxyRequest, type SsrfCheck } from "../runtime/proxy-serve";
+import { PROXY_PROFILE_PROTOCOL, PROXY_PROFILE_VERSION } from "../runtime/profile-v1";
 import type { SafeResolution } from "../runtime/ssrf";
 
 const allow =
@@ -52,9 +53,11 @@ for (const target of [
 
 // A local HTTP upstream. The real guard blocks loopback, so tests inject a
 // permissive ssrfCheck (same pattern as the server suite's noSsrf helper).
+let upstreamHits = 0;
 const server = Bun.serve({
   port: 0,
   async fetch(req) {
+    upstreamHits++;
     const url = new URL(req.url);
     if (url.pathname === "/redirect") {
       return new Response(null, { status: 302, headers: { location: "http://169.254.169.254/" } });
@@ -94,6 +97,42 @@ try {
     assert.match(res.headers["content-type"] ?? "", /text\/plain/);
     assert.equal(res.headers["x-host-seen"], `127.0.0.1:${port}`);
     checks += 4;
+  }
+
+  // profile-v1 is enforced and cached by the node itself.
+  {
+    clearProxyProfileCache();
+    const profile = {
+      protocol: PROXY_PROFILE_PROTOCOL,
+      version: PROXY_PROFILE_VERSION,
+      base_url: `http://127.0.0.1:${port}/`,
+      allowed_methods: ["GET"],
+      allowed_paths: ["/echo"],
+      cache_ttl: 60,
+      verbose: false,
+      direct: true,
+    };
+    const before = upstreamHits;
+    const first = await serveProxyRequest(
+      { target_url: `http://127.0.0.1:${port}/echo`, method: "GET", profile },
+      { ssrfCheck: allow("127.0.0.1") },
+    );
+    const second = await serveProxyRequest(
+      { target_url: `http://127.0.0.1:${port}/echo`, method: "GET", profile },
+      { ssrfCheck: allow("127.0.0.1") },
+    );
+    assert.equal(first.cached, false);
+    assert.equal(second.cached, true);
+    assert.equal(upstreamHits - before, 1, "node profile cache serves the second request locally");
+    assert.equal(first.profile_hash, second.profile_hash);
+    await assert.rejects(
+      () => serveProxyRequest(
+        { target_url: `http://127.0.0.1:${port}/redirect`, method: "GET", profile },
+        { ssrfCheck: allow("127.0.0.1") },
+      ),
+      /not allowed/,
+    );
+    checks += 5;
   }
 
   // 3) IP-pin + Host preservation: a hostname mapped to loopback still reaches

@@ -14,6 +14,11 @@
 
 import { checkServerIdentity, type PeerCertificate } from "node:tls";
 import { resolveAndCheckTarget, type SafeResolution } from "./ssrf";
+import { generateDedupeKey } from "./dedupe";
+import {
+  prepareProxyProfileRequestV1,
+  type ProxyExecutionProfileV1,
+} from "./profile-v1";
 
 export type SsrfCheck = (url: string) => Promise<SafeResolution>;
 
@@ -22,6 +27,7 @@ export interface ProxyServeRequest {
   method?: string;
   headers?: Record<string, string>;
   body?: string | Buffer | null;
+  profile?: ProxyExecutionProfileV1;
 }
 
 export interface ProxyResult {
@@ -29,6 +35,8 @@ export interface ProxyResult {
   statusText: string;
   headers: Record<string, string>;
   body: Buffer;
+  cached?: boolean;
+  profile_hash?: string;
 }
 
 export interface ProxyServeOptions {
@@ -49,6 +57,33 @@ interface BunFetchInit extends RequestInit {
 }
 
 const DEFAULT_TIMEOUT_MS = 30_000;
+const MAX_PROFILE_CACHE_ENTRIES = 1_000;
+const profileCache = new Map<string, { value: ProxyResult; expiresAt: number }>();
+
+export function clearProxyProfileCache(): void {
+  profileCache.clear();
+}
+
+function cachedProfileResult(key: string): ProxyResult | null {
+  const entry = profileCache.get(key);
+  if (!entry) return null;
+  if (entry.expiresAt <= Date.now()) {
+    profileCache.delete(key);
+    return null;
+  }
+  return { ...entry.value, body: Buffer.from(entry.value.body), cached: true };
+}
+
+function storeProfileResult(key: string, value: ProxyResult, ttlSeconds: number): void {
+  if (profileCache.size >= MAX_PROFILE_CACHE_ENTRIES) {
+    const oldest = profileCache.keys().next().value as string | undefined;
+    if (oldest) profileCache.delete(oldest);
+  }
+  profileCache.set(key, {
+    value: { ...value, body: Buffer.from(value.body), cached: false },
+    expiresAt: Date.now() + ttlSeconds * 1_000,
+  });
+}
 
 // Always-hop-by-hop headers (RFC 7230 §6.1); `host` we set ourselves. The
 // `Connection` header itself additionally NAMES further hop-by-hop headers that
@@ -121,6 +156,24 @@ export async function serveProxyRequest(
 ): Promise<ProxyResult> {
   const ssrfCheck = opts.ssrfCheck ?? resolveAndCheckTarget;
   const method = (request.method ?? "GET").toUpperCase();
+  const prepared = request.profile
+    ? prepareProxyProfileRequestV1(request.profile, request.target_url, method, request.headers)
+    : undefined;
+  const profile = prepared?.profile;
+  const profileHash = prepared?.profile_hash;
+  const cacheKey = profile?.cache_ttl
+    ? generateDedupeKey({
+        target_url: request.target_url,
+        method,
+        headers: prepared?.headers ?? request.headers,
+        body: request.body,
+        profile_hash: profileHash,
+      })
+    : undefined;
+  if (cacheKey) {
+    const cached = cachedProfileResult(cacheKey);
+    if (cached) return cached;
+  }
 
   // SSRF gate: throws TypeError for private/loopback/invalid targets.
   const resolution = await ssrfCheck(request.target_url);
@@ -133,9 +186,10 @@ export async function serveProxyRequest(
   // Pin the connection to the verified IP — no second DNS lookup.
   url.hostname = resolution.family === 6 ? `[${resolution.ip}]` : resolution.ip;
 
-  const deny = buildHopByHopDenySet(request.headers ?? {});
+  const effectiveHeaders = prepared?.headers ?? request.headers ?? {};
+  const deny = buildHopByHopDenySet(effectiveHeaders);
   const headers = new Headers();
-  for (const [key, value] of Object.entries(request.headers ?? {})) {
+  for (const [key, value] of Object.entries(effectiveHeaders)) {
     const lower = key.toLowerCase();
     if (deny.has(lower) || CONSENSUS_CONTROL_HEADERS.has(lower)) continue;
     headers.set(key, value);
@@ -163,10 +217,16 @@ export async function serveProxyRequest(
 
   const response = await fetch(url.toString(), init);
 
-  return {
+  const result: ProxyResult = {
     status: response.status,
     statusText: response.statusText,
     headers: Object.fromEntries(response.headers.entries()),
     body: Buffer.from(await response.arrayBuffer()),
+    cached: false,
+    ...(profileHash ? { profile_hash: profileHash } : {}),
   };
+  if (cacheKey && profile?.cache_ttl && result.status >= 200 && result.status < 300) {
+    storeProfileResult(cacheKey, result, profile.cache_ttl);
+  }
+  return result;
 }

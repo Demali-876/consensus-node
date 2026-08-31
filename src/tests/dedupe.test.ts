@@ -31,4 +31,10 @@ assert.equal(generateDedupeKey(base), generateDedupeKey({ ...base, target_url: '
 assert.equal(generateDedupeKey(base), generateDedupeKey({ ...base, method: 'get' }));
 checks += 3;
 
+assert.notEqual(
+  generateDedupeKey({ ...base, headers: { authorization: 'Bearer a' } }),
+  generateDedupeKey({ ...base, headers: { authorization: 'Bearer b' } }),
+);
+checks++;
+
 console.log(`dedupe.test.ts: ${checks} dedupe vectors verified under Bun — node matches the orchestrator`);
