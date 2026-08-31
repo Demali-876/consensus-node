@@ -11,10 +11,12 @@ export interface NodeIdentity {
 export async function loadOrCreateIdentity(): Promise<NodeIdentity> {
   const p = await ensureState();
   if ((await exists(p.privateKeyPem)) && (await exists(p.publicKeyPem))) {
-    // A decryption failure here throws rather than falling through to key
-    // generation. That is deliberate: minting a fresh identity because the data key
-    // went missing would silently orphan the node's registration on the
-    // orchestrator, which is far worse than refusing to start.
+    // readSecretFile returns null ONLY when the file is genuinely absent. A
+    // decryption failure, an unreadable file, or a damaged data key all throw
+    // rather than falling through to key generation. That is deliberate: minting a
+    // fresh identity here would overwrite the registered private key and silently
+    // orphan the node on the orchestrator, which is far worse than refusing to
+    // start.
     const privateKeyPem = await readSecretFile(SLOT_NODE_KEY, p.privateKeyPem);
     if (privateKeyPem) {
       return {

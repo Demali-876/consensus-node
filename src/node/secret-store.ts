@@ -126,13 +126,32 @@ const keyfileAdapter: KeystoreAdapter = {
     return process.platform === "darwin" || process.platform === "linux";
   },
   async get() {
+    const file = keyFilePath();
+    let raw: string;
     try {
-      const raw = await fs.readFile(keyFilePath(), "utf8");
-      const key = Buffer.from(raw.trim(), "base64");
-      return key.length === DEK_BYTES ? key : null;
-    } catch {
-      return null;
+      raw = await fs.readFile(file, "utf8");
+    } catch (error) {
+      // Only a genuinely absent key means "not provisioned yet". Every other error
+      // (EACCES, EIO, a directory in the way) must NOT read as absent: the caller
+      // would mint a replacement and overwrite this file, and every secret already
+      // sealed under the old key would become unrecoverable.
+      if ((error as NodeJS.ErrnoException).code === "ENOENT") return null;
+      throw new Error(
+        `data key at ${file} exists but could not be read (${(error as NodeJS.ErrnoException).code ?? "unknown"}). ` +
+          "Refusing to continue: replacing it would make every existing secret unrecoverable.",
+      );
     }
+
+    const key = Buffer.from(raw.trim(), "base64");
+    if (key.length !== DEK_BYTES) {
+      // Present but truncated or corrupt. Fail closed for the same reason.
+      throw new Error(
+        `data key at ${file} is malformed: decoded to ${key.length} bytes, expected ${DEK_BYTES}. ` +
+          "Restore the original file from backup. Delete it only if you accept that every " +
+          "secret encrypted under it — including this node's identity — is unrecoverable.",
+      );
+    }
+    return key;
   },
   async set(key) {
     const file = keyFilePath();
@@ -261,8 +280,16 @@ export async function readSecretFile(slot: string, file: string): Promise<string
   let raw: string;
   try {
     raw = await fs.readFile(file, "utf8");
-  } catch {
-    return null;
+  } catch (error) {
+    // Absent is a legitimate state — the caller provisions it. Anything else is not:
+    // loadOrCreateIdentity treats null as "no identity yet" and generates a new key,
+    // so swallowing EACCES here would rotate a registered node's identity and orphan
+    // it on the orchestrator.
+    if ((error as NodeJS.ErrnoException).code === "ENOENT") return null;
+    throw new Error(
+      `secret ${slot} at ${file} exists but could not be read ` +
+        `(${(error as NodeJS.ErrnoException).code ?? "unknown"}). Refusing to treat it as absent.`,
+    );
   }
 
   let parsed: unknown;

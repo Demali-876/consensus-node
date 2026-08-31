@@ -133,6 +133,50 @@ try {
       /not allowed/,
     );
     checks += 5;
+
+    // A state-changing method must never be answered from cache: doing so would
+    // silently drop the second POST instead of performing it upstream.
+    clearProxyProfileCache();
+    const writeProfile = { ...profile, allowed_methods: ["POST"] };
+    const beforeWrites = upstreamHits;
+    const firstWrite = await serveProxyRequest(
+      { target_url: `http://127.0.0.1:${port}/echo`, method: "POST", body: "same", profile: writeProfile },
+      { ssrfCheck: allow("127.0.0.1") },
+    );
+    const secondWrite = await serveProxyRequest(
+      { target_url: `http://127.0.0.1:${port}/echo`, method: "POST", body: "same", profile: writeProfile },
+      { ssrfCheck: allow("127.0.0.1") },
+    );
+    assert.equal(firstWrite.cached, false);
+    assert.equal(secondWrite.cached, false, "an identical POST must not be served from cache");
+    assert.equal(upstreamHits - beforeWrites, 2, "both POSTs must reach the upstream");
+    checks += 3;
+
+    // Two callers differing ONLY by a forwarded header must not share a cache entry.
+    // generateDedupeKey ignores such headers, so keying on it alone leaked one
+    // tenant's response to another.
+    clearProxyProfileCache();
+    const tenantProfile = profile;
+    const beforeTenants = upstreamHits;
+    const tenantA = await serveProxyRequest(
+      { target_url: `http://127.0.0.1:${port}/echo`, method: "GET", headers: { "x-tenant-id": "tenant-a" }, profile: tenantProfile },
+      { ssrfCheck: allow("127.0.0.1") },
+    );
+    const tenantB = await serveProxyRequest(
+      { target_url: `http://127.0.0.1:${port}/echo`, method: "GET", headers: { "x-tenant-id": "tenant-b" }, profile: tenantProfile },
+      { ssrfCheck: allow("127.0.0.1") },
+    );
+    assert.equal(tenantA.cached, false);
+    assert.equal(tenantB.cached, false, "a different forwarded header must miss the cache");
+    assert.equal(upstreamHits - beforeTenants, 2, "each tenant must reach the upstream");
+
+    // ...while an identical repeat still hits, so the fix did not disable caching.
+    const tenantARepeat = await serveProxyRequest(
+      { target_url: `http://127.0.0.1:${port}/echo`, method: "GET", headers: { "x-tenant-id": "tenant-a" }, profile: tenantProfile },
+      { ssrfCheck: allow("127.0.0.1") },
+    );
+    assert.equal(tenantARepeat.cached, true, "an identical request still caches");
+    checks += 4;
   }
 
   // 3) IP-pin + Host preservation: a hostname mapped to loopback still reaches

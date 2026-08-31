@@ -14,7 +14,7 @@
 
 import { checkServerIdentity, type PeerCertificate } from "node:tls";
 import { resolveAndCheckTarget, type SafeResolution } from "./ssrf";
-import { generateDedupeKey } from "./dedupe";
+import { generateDedupeKey, sha256Hex, stableStringify } from "./dedupe";
 import {
   prepareProxyProfileRequestV1,
   type ProxyExecutionProfileV1,
@@ -150,6 +150,38 @@ const CONSENSUS_CONTROL_HEADERS = new Set([
   "forwarded",
 ]);
 
+/** Only responses to safe, idempotent methods may be served from cache. Caching a
+ *  POST/PUT/PATCH/DELETE would answer a repeated state-changing request locally and
+ *  never contact the upstream, silently suppressing the second operation. */
+const CACHEABLE_METHODS = new Set(["GET", "HEAD"]);
+
+/** The headers this request will actually forward upstream, lowercased and sorted.
+ *  Used both to build the outgoing Headers and to key the cache. */
+function forwardedHeaderEntries(effectiveHeaders: Record<string, string>): Array<[string, string]> {
+  const deny = buildHopByHopDenySet(effectiveHeaders);
+  const entries: Array<[string, string]> = [];
+  for (const [key, value] of Object.entries(effectiveHeaders)) {
+    const lower = key.toLowerCase();
+    if (deny.has(lower) || CONSENSUS_CONTROL_HEADERS.has(lower)) continue;
+    entries.push([lower, value]);
+  }
+  return entries.sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0));
+}
+
+/** generateDedupeKey keys on a two-header allowlist (accept, content-type) because
+ *  that is the locked cross-repo wire format. This node-local cache forwards far
+ *  more than that — authorization, x-tenant-id, api-key — so keying on the dedupe
+ *  key alone would serve one caller's response to another whose only difference is
+ *  such a header. Fold every forwarded header into the local key. This value never
+ *  leaves the node, so strengthening it does not touch the dedupe contract.
+ */
+function profileCacheKey(
+  dedupeKey: string,
+  forwarded: Array<[string, string]>,
+): string {
+  return sha256Hex(`${dedupeKey}\n${stableStringify(forwarded)}`);
+}
+
 export async function serveProxyRequest(
   request: ProxyServeRequest,
   opts: ProxyServeOptions = {},
@@ -161,15 +193,22 @@ export async function serveProxyRequest(
     : undefined;
   const profile = prepared?.profile;
   const profileHash = prepared?.profile_hash;
-  const cacheKey = profile?.cache_ttl
-    ? generateDedupeKey({
-        target_url: request.target_url,
-        method,
-        headers: prepared?.headers ?? request.headers,
-        body: request.body,
-        profile_hash: profileHash,
-      })
-    : undefined;
+  const effectiveHeaders = prepared?.headers ?? request.headers ?? {};
+  const forwarded = forwardedHeaderEntries(effectiveHeaders);
+
+  const cacheKey =
+    profile?.cache_ttl && CACHEABLE_METHODS.has(method)
+      ? profileCacheKey(
+          generateDedupeKey({
+            target_url: request.target_url,
+            method,
+            headers: effectiveHeaders,
+            body: request.body,
+            profile_hash: profileHash,
+          }),
+          forwarded,
+        )
+      : undefined;
   if (cacheKey) {
     const cached = cachedProfileResult(cacheKey);
     if (cached) return cached;
@@ -186,14 +225,8 @@ export async function serveProxyRequest(
   // Pin the connection to the verified IP — no second DNS lookup.
   url.hostname = resolution.family === 6 ? `[${resolution.ip}]` : resolution.ip;
 
-  const effectiveHeaders = prepared?.headers ?? request.headers ?? {};
-  const deny = buildHopByHopDenySet(effectiveHeaders);
   const headers = new Headers();
-  for (const [key, value] of Object.entries(effectiveHeaders)) {
-    const lower = key.toLowerCase();
-    if (deny.has(lower) || CONSENSUS_CONTROL_HEADERS.has(lower)) continue;
-    headers.set(key, value);
-  }
+  for (const [key, value] of forwarded) headers.set(key, value);
   headers.set("host", originalHost);
   if (!headers.has("user-agent")) headers.set("user-agent", "Consensus-Node/0.1");
 

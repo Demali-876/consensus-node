@@ -183,6 +183,43 @@ try {
   resetDataKeyCache();
   assert.equal(await readSecretFile(SLOT_NODE_KEY, bootFile), PEM_SAMPLE, "survives a restart");
 
+  // --- fail closed on damaged key material ---------------------------------
+  // The catastrophic case: a present-but-unusable data key must never be silently
+  // replaced, because every secret sealed under the old one becomes unrecoverable.
+
+  const sealedUnderMinted = path.join(root, "outside-sealed-2.json");
+  await writeSecretFile(SLOT_NODE_KEY, sealedUnderMinted, PEM_SAMPLE);
+
+  await fs.writeFile(keyFile, "dHJ1bmNhdGVk", { mode: 0o600 }); // decodes to 9 bytes
+  resetDataKeyCache();
+  await assert.rejects(
+    () => getOrCreateDataKey(),
+    /malformed/,
+    "a truncated data key must throw, not be silently regenerated",
+  );
+  assert.equal(
+    await fs.readFile(keyFile, "utf8"),
+    "dHJ1bmNhdGVk",
+    "the malformed key file must NOT be overwritten",
+  );
+
+  // An unreadable secret file must not read as absent: loadOrCreateIdentity treats
+  // null as "no identity yet" and would rotate a registered node's key.
+  await fs.writeFile(keyFile, minted.toString("base64"), { mode: 0o600 });
+  resetDataKeyCache();
+  await fs.chmod(sealedUnderMinted, 0o000);
+  await assert.rejects(
+    () => readSecretFile(SLOT_NODE_KEY, sealedUnderMinted),
+    /could not be read/,
+    "an unreadable secret must throw rather than report absent",
+  );
+  await fs.chmod(sealedUnderMinted, 0o600);
+  assert.equal(
+    await readSecretFile(SLOT_NODE_KEY, sealedUnderMinted),
+    PEM_SAMPLE,
+    "and still opens once readable again",
+  );
+
   delete process.env.CONSENSUS_NODE_SECRET_KEY_PATH;
   if (injected) process.env.CONSENSUS_NODE_SECRET_KEY = injected;
   resetDataKeyCache();
