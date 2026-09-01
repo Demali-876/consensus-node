@@ -148,6 +148,10 @@ async function handleWizardRequest(input: {
     return startPm2FromWizard();
   }
 
+  if (method === "GET" && url.pathname === "/api/headless-status") {
+    return jsonResponse(await headlessStatus());
+  }
+
   if (method === "GET" && url.pathname === "/success") {
     const progress = await loadSetupProgress();
     if (!isCurrentAgreementAccepted(progress)) return redirectResponse(`/?token=${encodeURIComponent(token)}`);
@@ -161,6 +165,8 @@ async function handleWizardRequest(input: {
       faviconUrl: `/favicon.svg?token=${encodeURIComponent(token)}`,
       statusUrl: `/api/registration-status?token=${encodeURIComponent(token)}`,
       pm2Url: `/api/start-pm2?token=${encodeURIComponent(token)}`,
+      headlessUrl: `/api/headless-status?token=${encodeURIComponent(token)}`,
+      installDir: progress.installDir ?? DEFAULT_INSTALL_DIR,
       reloadUrl: `/api/reload-version?token=${encodeURIComponent(token)}`,
       serverStartId: templateVersion,
       devReload: DEV_RELOAD,
@@ -651,6 +657,61 @@ async function registerNodeFromWizard(input: unknown): Promise<Response> {
     config,
     pm2,
     registration: await registrationView(next),
+  });
+}
+
+/** Whether this machine will bring the node back after a reboot with no login.
+ *
+ *  The wizard cannot run the installer itself — writing to /Library/LaunchDaemons
+ *  needs root, and prompting for a password from a local web page would be a poor
+ *  trade. So it reports state and holds the operator at this step until the boot
+ *  unit is actually present.
+ *
+ *  Deliberately NOT `pm2 startup`: on macOS that writes a LaunchAgent, which loads
+ *  only at user login — the exact failure this step exists to prevent. */
+async function headlessStatus(): Promise<Record<string, unknown>> {
+  const progress = await loadSetupProgress();
+  const dir = progress.installDir ?? DEFAULT_INSTALL_DIR;
+  const plist = "/Library/LaunchDaemons/com.consensus.node.plist";
+  const daemonInstalled = await pathExistsWizard(plist);
+
+  let fileVaultOn: boolean | null = null;
+  if (process.platform === "darwin") {
+    try {
+      const out = await runForOutputWizard("fdesetup", ["status"]);
+      fileVaultOn = !/FileVault is Off/i.test(out);
+    } catch {
+      fileVaultOn = null;
+    }
+  }
+
+  return {
+    platform: process.platform,
+    daemonInstalled,
+    plist,
+    fileVaultOn,
+    installCommand: `sudo ${path.join(dir, "current", "scripts", "install-launchd.sh")}`,
+    restartCommand: `sudo ${path.join(dir, "current", "scripts", "node-service.sh")} restart`,
+    ready: daemonInstalled && fileVaultOn !== true,
+  };
+}
+
+async function pathExistsWizard(file: string): Promise<boolean> {
+  try {
+    await access(file);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+function runForOutputWizard(command: string, args: string[]): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const child = spawn(command, args, { stdio: ["ignore", "pipe", "ignore"] });
+    let out = "";
+    child.stdout.on("data", (chunk) => { out += String(chunk); });
+    child.once("error", reject);
+    child.once("close", () => resolve(out));
   });
 }
 

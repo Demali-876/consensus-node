@@ -3,6 +3,7 @@ import websocket from "@fastify/websocket";
 import { loadConfig } from "../node/state";
 import { releaseManifest } from "../node/manifest";
 import { integrityPayload } from "../node/integrity";
+import { headlessBootStatus } from "../node/headless";
 import { capabilitiesRecord } from "./capabilities";
 import { registerBenchmarkRoutes } from "./benchmarks/routes";
 import { registerProxyRoutes } from "./proxy-worker";
@@ -18,6 +19,7 @@ export async function buildServer() {
     const config = await loadConfig();
     return {
       status: "healthy",
+      headless_boot: headlessBootStatus(),
       registered: Boolean(config.node_id),
       node_id: config.node_id ?? null,
       domain: config.domain ?? null,

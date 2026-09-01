@@ -134,7 +134,16 @@ echo "  bun:         ${bun_bin}"
 echo "  install dir: ${install_dir}"
 echo "  state dir:   ${state_dir}"
 echo
-echo "Status: sudo launchctl print system/${LABEL}"
-echo "Logs:   tail -f ${state_dir}/launchd.err.log"
+echo "Status:  sudo scripts/node-service.sh status"
+echo "Restart: sudo scripts/node-service.sh restart"
+echo "Ping:    scripts/node-service.sh ping"
+echo "Logs:    scripts/node-service.sh logs"
 echo
-echo "It now starts at boot with no login required. Verify with a reboot."
+echo "This is a LaunchDaemon, so it starts at boot without a login (unlike"
+echo "\`pm2 startup\`, which writes a login-gated LaunchAgent on macOS)."
+echo
+echo "Check it end to end now:"
+echo "  sudo scripts/node-service.sh restart"
+echo
+echo "That relaunches the unit and waits for the orchestrator to report this node"
+echo "active again — the node is not really back until the orchestrator sees it."

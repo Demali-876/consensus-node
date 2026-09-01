@@ -69,13 +69,17 @@
         <section class="install-card success-card">
           <div class="install-head">
             <div>
-              <h2>Reboot persistence</h2>
-              <p>Run this once if you want PM2 to restore the control tunnel after a machine reboot.</p>
+              <h2>Headless boot <span class="env-status mono pending" id="headless-status">Required</span></h2>
+              <p id="headless-note">A node must come back after a reboot <strong>without anyone logging in</strong>. Run this once, in a terminal, then press Re-check.</p>
             </div>
           </div>
           <div class="cmd-list">
-            <div class="cmd-row"><span class="mono">pm2 startup</span><button class="small-btn copy-cmd" type="button">Copy</button></div>
-            <div class="cmd-row"><span class="mono">pm2 save</span><button class="small-btn copy-cmd" type="button">Copy</button></div>
+            <div class="cmd-row"><span class="mono" id="headless-install-cmd">sudo scripts/install-launchd.sh</span><button class="small-btn copy-cmd" type="button">Copy</button></div>
+            <div class="cmd-row"><span class="mono" id="headless-restart-cmd">sudo scripts/node-service.sh restart</span><button class="small-btn copy-cmd" type="button">Copy</button></div>
+          </div>
+          <p class="helper" id="headless-detail">Checking...</p>
+          <div class="cmd-list">
+            <button class="small-btn" id="headless-recheck" type="button">Re-check</button>
           </div>
         </section>
       </div>

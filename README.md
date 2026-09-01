@@ -233,3 +233,26 @@ Two prerequisites for a truly headless node:
   `sudo fdesetup authrestart` boots once unattended, but power loss still needs a human.
 - **Automatic restart after a power cut**, so the machine comes back at all:
   `sudo pmset -a autorestart 1` (and `sudo pmset -a sleep 0` to stop it sleeping).
+
+### Operating and proving it
+
+```bash
+sudo scripts/node-service.sh restart   # relaunch, then wait for the node to serve
+sudo scripts/node-service.sh status
+scripts/node-service.sh ping           # is the orchestrator seeing this node?
+scripts/node-service.sh logs
+```
+
+`restart` relaunches the unit and then waits for the **orchestrator** to report this
+node `active` again. That distinction matters: a live pid only says the unit
+relaunched, while the orchestrator confirms the node reconnected and is serving.
+`ping` asks the same question on its own.
+
+There is deliberately no command that claims to prove the node started *before* a
+login. Whether a given start was pre- or post-login is not something the machine can
+report reliably after the fact, so the check that earns its keep is operational —
+restart it and confirm it comes back and serves.
+
+Existing nodes that predate the boot unit do not need the wizard: the supervisor logs
+`headless-boot-NOT-configured` at startup and `/health` reports `headless_boot`, so an
+operator can see which nodes would not survive an unattended reboot.

@@ -52,6 +52,45 @@
     }
   }
 
+  async function loadHeadless() {
+    const statusEl = byId("headless-status");
+    const detail = byId("headless-detail");
+    try {
+      const response = await fetch(config.headlessUrl, { cache: "no-store" });
+      const body = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(body.error || "Could not read headless status");
+
+      if (body.installCommand) byId("headless-install-cmd").textContent = body.installCommand;
+      if (body.restartCommand) byId("headless-restart-cmd").textContent = body.restartCommand;
+
+      if (body.platform !== "darwin") {
+        statusEl.className = "env-status mono pending";
+        statusEl.textContent = "Linux";
+        detail.textContent = "On Linux, install systemd/consensus-node.service instead. Do not rely on pm2 startup.";
+        return;
+      }
+      if (body.fileVaultOn === true) {
+        statusEl.className = "env-status mono err";
+        statusEl.textContent = "Blocked";
+        detail.textContent = "FileVault is ON. The Mac stops at a pre-boot unlock prompt, so nothing runs until someone types the password — no daemon can change that. Turn FileVault off for a headless node.";
+        return;
+      }
+      if (!body.daemonInstalled) {
+        statusEl.className = "env-status mono err";
+        statusEl.textContent = "Not installed";
+        detail.textContent = "The boot service is not installed, so this node will NOT come back after a reboot until someone logs in. Run the command above, then press Re-check.";
+        return;
+      }
+      statusEl.className = "env-status mono ok";
+      statusEl.textContent = "Installed";
+      detail.textContent = "Boot service installed — this node starts at boot without a login. Use the restart command any time to relaunch it and confirm the orchestrator sees it come back.";
+    } catch (error) {
+      statusEl.className = "env-status mono err";
+      statusEl.textContent = "Unknown";
+      detail.textContent = error.message || "Could not read headless status";
+    }
+  }
+
   function startDevReload() {
     if (!config.devReload) return;
     window.setInterval(async () => {
@@ -77,7 +116,11 @@
     });
   });
   byId("start-pm2").addEventListener("click", startPm2);
+  byId("headless-recheck").addEventListener("click", () => {
+    loadHeadless().catch(() => {});
+  });
 
+  loadHeadless().catch(() => {});
   loadStatus().catch((error) => {
     helper.textContent = error.message || "Could not load success state";
   });
