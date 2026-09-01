@@ -245,6 +245,8 @@ export interface SuccessHtmlInput {
   faviconUrl: string;
   statusUrl: string;
   pm2Url: string;
+  headlessUrl: string;
+  installDir: string;
   reloadUrl: string;
   serverStartId: string;
   devReload: boolean;
@@ -259,6 +261,8 @@ export async function renderSuccessHtml(input: SuccessHtmlInput): Promise<string
   const config = safeScriptJson({
     progress: input.progress,
     statusUrl: input.statusUrl,
+    headlessUrl: input.headlessUrl,
+    installDir: input.installDir,
     pm2Url: input.pm2Url,
     reloadUrl: input.reloadUrl,
     serverStartId: input.serverStartId,

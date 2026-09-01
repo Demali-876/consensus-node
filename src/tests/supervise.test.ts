@@ -125,4 +125,20 @@ try {
   await fs.rm(root, { recursive: true, force: true });
 }
 
+// The headless-boot warning must reflect reality, since an existing node's only
+// signal that it would not survive a reboot is this line in its logs.
+{
+  const { headlessBootStatus } = await import("../node/headless");
+  const status = headlessBootStatus();
+  assert.equal(typeof status.configured, "boolean");
+  assert.equal(typeof status.detail, "string");
+  assert.equal(status.detail.length > 0, true, "the operator needs an actionable message");
+  if (process.platform === "darwin") {
+    assert.equal(status.mechanism, "launchd");
+    // Whatever the answer, `unit` and `configured` must agree — a claim of
+    // "configured" with no unit behind it would be a false all-clear.
+    assert.equal(status.configured, status.unit !== null);
+  }
+}
+
 console.log("supervise ok");

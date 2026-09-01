@@ -24,6 +24,7 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { log } from "./log";
+import { headlessBootStatus } from "./node/headless";
 
 /** Same exit code run-node.sh used when `current` is missing. */
 const NO_RELEASE_EXIT = 70;
@@ -189,6 +190,18 @@ async function main(): Promise<void> {
   }
 
   const children = [startChild("runtime", "start"), startChild("control", "control")];
+
+  // Existing nodes never revisit the setup wizard, so the only place they learn the
+  // node would not survive an unattended reboot is here.
+  const headless = headlessBootStatus();
+  if (headless.configured) {
+    log.info("supervise", "headless-boot-configured", { mechanism: headless.mechanism, unit: headless.unit });
+  } else {
+    log.warn("supervise", "headless-boot-NOT-configured", {
+      mechanism: headless.mechanism,
+      detail: headless.detail,
+    });
+  }
 
   log.info("supervise", "started", {
     current: currentDir,

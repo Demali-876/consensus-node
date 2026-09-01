@@ -243,11 +243,29 @@ sudo scripts/node-service.sh status
 scripts/node-service.sh logs
 ```
 
-`verify` does not assume the node is headless because a plist exists — it checks how
-long after boot the running process started. A process that came up seconds after
-boot cannot have waited for a login, so it reports **PROVEN**. To make that
-conclusive, reboot and run it over SSH **without logging in**; if you log in first,
-the check still passes but proves less.
+`verify` is strict about what counts as proof. Elapsed time since boot is **not**
+proof — an operator (or automatic login) can log in seconds after boot and start the
+service by hand, and no time window can tell that apart from a boot-triggered start.
 
-It also fails loudly when FileVault is on, since no daemon configuration can work
-around a pre-boot unlock prompt.
+What it requires instead is that **no console login exists on this boot** while the
+service is running. If nobody has logged in and the node is up, it demonstrably did
+not need a login. So the procedure is:
+
+1. reboot
+2. do **not** log in
+3. connect over SSH
+4. `sudo scripts/node-service.sh verify`
+
+If you are logged in at the console it reports *unproven* and says why, rather than
+passing on weak evidence.
+
+`verify` also asks the orchestrator whether this node is actually `active` — a
+running process only proves the unit started, not that the node reconnected and is
+serving. `restart` waits for that same signal before reporting success.
+
+It fails loudly when FileVault is on, since no daemon configuration can work around a
+pre-boot unlock prompt.
+
+Existing nodes that predate the boot unit do not need the wizard: the supervisor logs
+`headless-boot-NOT-configured` at startup and `/health` reports `headless_boot`, so an
+operator can see which nodes would not survive an unattended reboot.
