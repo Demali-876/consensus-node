@@ -6,7 +6,8 @@ import os from "node:os";
 import path from "node:path";
 import zlib from "node:zlib";
 
-import { serveProxyRequest, type SsrfCheck } from "../runtime/proxy-serve";
+import { clearProxyProfileCache, serveProxyRequest, type SsrfCheck } from "../runtime/proxy-serve";
+import { PROXY_PROFILE_PROTOCOL, PROXY_PROFILE_VERSION } from "../runtime/profile-v1";
 import type { SafeResolution } from "../runtime/ssrf";
 
 const allow =
@@ -52,9 +53,11 @@ for (const target of [
 
 // A local HTTP upstream. The real guard blocks loopback, so tests inject a
 // permissive ssrfCheck (same pattern as the server suite's noSsrf helper).
+let upstreamHits = 0;
 const server = Bun.serve({
   port: 0,
   async fetch(req) {
+    upstreamHits++;
     const url = new URL(req.url);
     if (url.pathname === "/redirect") {
       return new Response(null, { status: 302, headers: { location: "http://169.254.169.254/" } });
@@ -93,6 +96,86 @@ try {
     assert.equal(res.body.toString(), "echo:POST:hello");
     assert.match(res.headers["content-type"] ?? "", /text\/plain/);
     assert.equal(res.headers["x-host-seen"], `127.0.0.1:${port}`);
+    checks += 4;
+  }
+
+  // profile-v1 is enforced and cached by the node itself.
+  {
+    clearProxyProfileCache();
+    const profile = {
+      protocol: PROXY_PROFILE_PROTOCOL,
+      version: PROXY_PROFILE_VERSION,
+      base_url: `http://127.0.0.1:${port}/`,
+      allowed_methods: ["GET"],
+      allowed_paths: ["/echo"],
+      cache_ttl: 60,
+      verbose: false,
+      direct: true,
+    };
+    const before = upstreamHits;
+    const first = await serveProxyRequest(
+      { target_url: `http://127.0.0.1:${port}/echo`, method: "GET", profile },
+      { ssrfCheck: allow("127.0.0.1") },
+    );
+    const second = await serveProxyRequest(
+      { target_url: `http://127.0.0.1:${port}/echo`, method: "GET", profile },
+      { ssrfCheck: allow("127.0.0.1") },
+    );
+    assert.equal(first.cached, false);
+    assert.equal(second.cached, true);
+    assert.equal(upstreamHits - before, 1, "node profile cache serves the second request locally");
+    assert.equal(first.profile_hash, second.profile_hash);
+    await assert.rejects(
+      () => serveProxyRequest(
+        { target_url: `http://127.0.0.1:${port}/redirect`, method: "GET", profile },
+        { ssrfCheck: allow("127.0.0.1") },
+      ),
+      /not allowed/,
+    );
+    checks += 5;
+
+    // A state-changing method must never be answered from cache: doing so would
+    // silently drop the second POST instead of performing it upstream.
+    clearProxyProfileCache();
+    const writeProfile = { ...profile, allowed_methods: ["POST"] };
+    const beforeWrites = upstreamHits;
+    const firstWrite = await serveProxyRequest(
+      { target_url: `http://127.0.0.1:${port}/echo`, method: "POST", body: "same", profile: writeProfile },
+      { ssrfCheck: allow("127.0.0.1") },
+    );
+    const secondWrite = await serveProxyRequest(
+      { target_url: `http://127.0.0.1:${port}/echo`, method: "POST", body: "same", profile: writeProfile },
+      { ssrfCheck: allow("127.0.0.1") },
+    );
+    assert.equal(firstWrite.cached, false);
+    assert.equal(secondWrite.cached, false, "an identical POST must not be served from cache");
+    assert.equal(upstreamHits - beforeWrites, 2, "both POSTs must reach the upstream");
+    checks += 3;
+
+    // Two callers differing ONLY by a forwarded header must not share a cache entry.
+    // generateDedupeKey ignores such headers, so keying on it alone leaked one
+    // tenant's response to another.
+    clearProxyProfileCache();
+    const tenantProfile = profile;
+    const beforeTenants = upstreamHits;
+    const tenantA = await serveProxyRequest(
+      { target_url: `http://127.0.0.1:${port}/echo`, method: "GET", headers: { "x-tenant-id": "tenant-a" }, profile: tenantProfile },
+      { ssrfCheck: allow("127.0.0.1") },
+    );
+    const tenantB = await serveProxyRequest(
+      { target_url: `http://127.0.0.1:${port}/echo`, method: "GET", headers: { "x-tenant-id": "tenant-b" }, profile: tenantProfile },
+      { ssrfCheck: allow("127.0.0.1") },
+    );
+    assert.equal(tenantA.cached, false);
+    assert.equal(tenantB.cached, false, "a different forwarded header must miss the cache");
+    assert.equal(upstreamHits - beforeTenants, 2, "each tenant must reach the upstream");
+
+    // ...while an identical repeat still hits, so the fix did not disable caching.
+    const tenantARepeat = await serveProxyRequest(
+      { target_url: `http://127.0.0.1:${port}/echo`, method: "GET", headers: { "x-tenant-id": "tenant-a" }, profile: tenantProfile },
+      { ssrfCheck: allow("127.0.0.1") },
+    );
+    assert.equal(tenantARepeat.cached, true, "an identical request still caches");
     checks += 4;
   }
 

@@ -13,7 +13,7 @@ const NODE = "node-1";
 const request: DedupeParams = {
   target_url: "https://api.example.com/v1/data?b=2&a=1",
   method: "GET",
-  headers: { "content-type": "application/json", "x-api-key": "secret" },
+  headers: { "content-type": "application/json" },
 };
 const dedupeKey = generateDedupeKey(request);
 const otherRequest: DedupeParams = { ...request, target_url: "https://api.example.com/v1/OTHER" };
@@ -58,6 +58,30 @@ assert.throws(
   /does not match/,
 );
 checks++;
+
+// The anonymous profile hash is part of the request binding; changing the plan
+// invalidates a ticket even when URL/method/body are otherwise identical.
+{
+  const profiled = { ...request, profile_hash: "a".repeat(64) };
+  const profiledKey = generateDedupeKey(profiled);
+  const token = mint({ dedupeKey: profiledKey, jti: "profile-jti" });
+  assert.doesNotThrow(() => verifyRequestTicket({
+    token,
+    nodeId: NODE,
+    publicKey,
+    request: profiled,
+    now: 1010,
+    replay: new JtiReplayCache(),
+  }));
+  assert.throws(() => verifyRequestTicket({
+    token: mint({ dedupeKey: profiledKey, jti: "profile-jti-2" }),
+    nodeId: NODE,
+    publicKey,
+    request: { ...profiled, profile_hash: "b".repeat(64) },
+    now: 1010,
+  }), /does not match/);
+  checks += 2;
+}
 
 // 3) A ticket minted for another node is rejected (aud + implicit assertion).
 assert.throws(() =>

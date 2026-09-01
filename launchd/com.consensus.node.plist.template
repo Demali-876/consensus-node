@@ -1,0 +1,93 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN"
+  "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!--
+  LaunchDaemon template for the Consensus node.
+
+  Installed to /Library/LaunchDaemons by scripts/install-launchd.sh, which replaces
+  every at-sign-delimited placeholder below with an absolute path. This is a TEMPLATE
+  and not a usable plist on its own: launchd performs NO variable expansion
+  whatsoever, so a literal ${HOME} or ~ in any value below would be taken literally
+  rather than expanded. (The plist this replaces had exactly that bug.)
+
+  Do not write a placeholder-shaped token into these comments — install-launchd.sh
+  greps the rendered file for leftovers and aborts if it finds any.
+
+  A LaunchDaemon, not a LaunchAgent: agents load only at user login, which is the
+  whole problem this is here to solve. This runs at boot with no login. It launches
+  pm2-runtime — PM2 in the foreground, as a single supervised process — rather than
+  relying on `pm2 startup`, which itself emits a login-gated LaunchAgent.
+-->
+<plist version="1.0">
+<dict>
+  <key>Label</key>
+  <string>com.consensus.node</string>
+
+  <key>ProgramArguments</key>
+  <array>
+    <string>@PM2_RUNTIME@</string>
+    <string>start</string>
+    <string>@INSTALL_DIR@/current/ecosystem.config.cjs</string>
+    <string>--only</string>
+    <string>@APP_NAME@</string>
+  </array>
+
+  <!-- Drop from root to the operator so everything under the state dir keeps its
+       existing ownership. Without this the daemon would run as root and write
+       root-owned files into a user-owned tree. -->
+  <key>UserName</key>
+  <string>@USER@</string>
+
+  <key>WorkingDirectory</key>
+  <string>@INSTALL_DIR@/current</string>
+
+  <key>EnvironmentVariables</key>
+  <dict>
+    <!-- A daemon inherits no HOME, and both PM2 and bun need one. -->
+    <key>HOME</key>
+    <string>@HOME@</string>
+    <!-- launchd's default PATH has neither node nor bun on it. -->
+    <key>PATH</key>
+    <string>@PATH@</string>
+    <key>PM2_HOME</key>
+    <string>@HOME@/.pm2</string>
+    <key>CONSENSUS_SERVER_URL</key>
+    <string>@SERVER_URL@</string>
+    <key>CONSENSUS_STATE_DIR</key>
+    <string>@STATE_DIR@</string>
+    <key>CONSENSUS_NODE_INSTALL_DIR</key>
+    <string>@INSTALL_DIR@</string>
+    <key>CONSENSUS_NODE_UPDATE_COMMAND</key>
+    <string>@INSTALL_DIR@/current/scripts/install-release.sh</string>
+    <key>CONSENSUS_PM2_NAME</key>
+    <string>@APP_NAME@</string>
+    <key>CONSENSUS_BUN_PATH</key>
+    <string>@BUN@</string>
+  </dict>
+
+  <key>RunAtLoad</key>
+  <true/>
+
+  <key>KeepAlive</key>
+  <true/>
+
+  <!-- launchd refuses to respawn a job more than once per ThrottleInterval, which
+       keeps a node that is crash-looping (bad release, no network) from spinning. -->
+  <key>ThrottleInterval</key>
+  <integer>10</integer>
+
+  <key>ProcessType</key>
+  <string>Background</string>
+
+  <!-- Must exceed PM2's kill_timeout (30s) so PM2 can drain the node's children
+       before launchd loses patience and SIGKILLs the whole job. -->
+  <key>ExitTimeOut</key>
+  <integer>40</integer>
+
+  <key>StandardOutPath</key>
+  <string>@STATE_DIR@/launchd.out.log</string>
+
+  <key>StandardErrorPath</key>
+  <string>@STATE_DIR@/launchd.err.log</string>
+</dict>
+</plist>

@@ -17,6 +17,11 @@ import { generateDedupeKey } from "../runtime/dedupe";
 import { serveProxyRequest, type ProxyServeRequest, type SsrfCheck } from "../runtime/proxy-serve";
 import type { SafeResolution } from "../runtime/ssrf";
 import type { NodeIdentity } from "../crypto/identity";
+import {
+  PROXY_PROFILE_PROTOCOL,
+  PROXY_PROFILE_VERSION,
+  hashProxyProfileV1,
+} from "../runtime/profile-v1";
 
 // ---- fixtures -------------------------------------------------------------
 function newIdentity(): NodeIdentity {
@@ -134,6 +139,48 @@ try {
 
   // 2) Ticket bound to a different request -> unauthorized (request binding).
   {
+    const profile = {
+      protocol: PROXY_PROFILE_PROTOCOL,
+      version: PROXY_PROFILE_VERSION,
+      base_url: `http://127.0.0.1:${upstream.port}/`,
+      allowed_methods: ["POST"],
+      allowed_paths: ["/echo"],
+      cache_ttl: 60,
+      verbose: false,
+      direct: true,
+    };
+    const request = { ...echoRequest, profile };
+    const profileHash = hashProxyProfileV1(profile);
+    const dedupeKey = generateDedupeKey({
+      target_url: upstreamUrl,
+      method: "POST",
+      headers: echoRequest.headers,
+      body: Buffer.from("hi"),
+      profile_hash: profileHash,
+    });
+    const pipe = memoryPipe();
+    const [, response] = await Promise.all([
+      serveDataConnection(pipe.server, baseDeps(new JtiReplayCache())),
+      runDataRequest(pipe.client, clientParams(mint(dedupeKey, "j-profile"), request)),
+    ]);
+    assert.equal(response.type, "proxy_response");
+    assert.equal((response as { profile_hash?: string }).profile_hash, profileHash);
+
+    const tampered = memoryPipe();
+    const [, rejected] = await Promise.all([
+      serveDataConnection(tampered.server, baseDeps(new JtiReplayCache())),
+      runDataRequest(tampered.client, clientParams(
+        mint(dedupeKey, "j-profile-tampered"),
+        { ...echoRequest, profile: { ...profile, cache_ttl: 30 } },
+      )),
+    ]);
+    assert.equal(rejected.type, "error");
+    assert.equal((rejected as { code: string }).code, "unauthorized");
+    checks += 4;
+  }
+
+  // 3) Ticket bound to a different request -> unauthorized (request binding).
+  {
     const { client, server } = memoryPipe();
     const wrongToken = mint(generateDedupeKey({ target_url: "https://elsewhere.test/", method: "GET" }), "j-wrong");
     const [, resp] = await Promise.all([
@@ -145,7 +192,7 @@ try {
     checks += 2;
   }
 
-  // 3) Valid ticket but SSRF-blocked target -> upstream_error (default real guard).
+  // 4) Valid ticket but SSRF-blocked target -> upstream_error (default real guard).
   {
     const { client, server } = memoryPipe();
     const blocked: ProxyServeRequest = { target_url: "http://127.0.0.1/", method: "GET" };
@@ -166,7 +213,7 @@ try {
     checks += 3;
   }
 
-  // 4) Replay: the same ticket spent twice across connections (shared cache).
+  // 5) Replay: the same ticket spent twice across connections (shared cache).
   {
     const replay = new JtiReplayCache();
     const token = mint(echoDedupe, "j-replay");
@@ -186,7 +233,7 @@ try {
     checks += 3;
   }
 
-  // 5) Live WebSocket round-trip through the actual Fastify route.
+  // 6) Live WebSocket round-trip through the actual Fastify route.
   {
     const app = Fastify();
     await app.register(websocket);

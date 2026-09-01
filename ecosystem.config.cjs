@@ -13,37 +13,40 @@ const currentDir = path.join(installDir, "current");
 
 fs.mkdirSync(stateDir, { recursive: true });
 
-// run-node.sh needs bash >= 4.3 (`wait -n`). PM2's `interpreter` overrides the script
-// shebang, so pin a sufficiently new bash explicitly — preferring Homebrew bash on
-// macOS, where /bin/bash is 3.2 (so the documented Homebrew workaround actually takes
-// effect under PM2). Falls back to /bin/bash, where run-node.sh prints a clear error,
-// so evaluating this config never throws.
-function resolveBash() {
-  const { execSync } = require("node:child_process");
-  for (const bash of ["/opt/homebrew/bin/bash", "/usr/local/bin/bash", "/usr/bin/bash", "/bin/bash"]) {
+// PM2's `interpreter` overrides the script shebang, so bun has to be named
+// explicitly. Resolve it to an ABSOLUTE path: this config is also evaluated when PM2
+// itself is started by a boot-time daemon (launchd/systemd), whose PATH does not
+// include ~/.bun/bin, so a bare "bun" would not resolve there. Falls back to the bare
+// name — where PM2 reports a clear interpreter error — so evaluating this never throws.
+function resolveBun() {
+  const candidates = [
+    process.env.CONSENSUS_BUN_PATH,
+    path.join(os.homedir(), ".bun", "bin", "bun"),
+    "/opt/homebrew/bin/bun",
+    "/usr/local/bin/bun",
+    "/usr/bin/bun",
+  ];
+  for (const candidate of candidates) {
     try {
-      if (!fs.existsSync(bash)) continue;
-      const out = execSync(`${bash} --version`, { stdio: ["ignore", "pipe", "ignore"] }).toString();
-      const m = out.match(/version (\d+)\.(\d+)/);
-      if (m && (Number(m[1]) > 4 || (Number(m[1]) === 4 && Number(m[2]) >= 3))) return bash;
+      if (candidate && fs.existsSync(candidate)) return candidate;
     } catch {
       /* try next candidate */
     }
   }
-  return "/bin/bash";
+  return "bun";
 }
 
-const bashInterpreter = resolveBash();
+const bunInterpreter = resolveBun();
 
 module.exports = {
   apps: [
     {
       name: appName,
-      // run-node.sh runs the outbound control tunnel (which carries the data
+      // supervise.ts runs the outbound control tunnel (which carries the data
       // plane via the orchestrator gateway) AND a loopback-only runtime server as
       // one unit. (run-control.sh, control-only, is kept for reference.)
-      script: path.join(currentDir, "scripts", "run-node.sh"),
-      interpreter: bashInterpreter,
+      script: path.join(currentDir, "src", "supervise.ts"),
+      interpreter: bunInterpreter,
       cwd: currentDir,
       instances: 1,
       exec_mode: "fork",

@@ -30,6 +30,10 @@ import { verifyRequestTicket } from "../tickets/request-ticket";
 import type { JtiReplayCache } from "../tickets/replay";
 import type { DedupeParams } from "../runtime/dedupe";
 import { serveProxyRequest, type ProxyResult, type ProxyServeRequest } from "../runtime/proxy-serve";
+import {
+  prepareProxyProfileRequestV1,
+  type ProxyExecutionProfileV1,
+} from "../runtime/profile-v1";
 import type { NodeIdentity } from "../crypto/identity";
 
 export const DATA_PLANE_PATH = "/connect";
@@ -49,6 +53,7 @@ export interface ProxyRequestPayload {
   headers?: Record<string, string>;
   body?: string; // base64 when present
   body_encoding?: "base64";
+  profile?: ProxyExecutionProfileV1;
 }
 
 export type ProxyResponsePayload =
@@ -59,6 +64,8 @@ export type ProxyResponsePayload =
       headers: Record<string, string>;
       body: string; // base64
       body_encoding: "base64";
+      cached?: boolean;
+      profile_hash?: string;
     }
   | { type: "error"; code: string; message: string };
 
@@ -95,7 +102,7 @@ export async function runDataRequest(
     nodeId: string;
     expectedNodePublicKeyPem: string;
     token: string;
-    request: { target_url: string; method?: string; headers?: Record<string, string>; body?: string | Buffer | null };
+    request: { target_url: string; method?: string; headers?: Record<string, string>; body?: string | Buffer | null; profile?: ProxyExecutionProfileV1 };
   },
 ): Promise<ProxyResponsePayload> {
   const client = await createDataInit({ nodeId: params.nodeId });
@@ -118,6 +125,7 @@ export async function runDataRequest(
     headers: params.request.headers,
     body: body ? body.toString("base64") : undefined,
     body_encoding: body ? "base64" : undefined,
+    profile: params.request.profile,
   };
   await transport.send(sealFrame(session.sendKey, FRAME_TYPE.DATA, 0n, encodeJson(payload)));
 
@@ -145,7 +153,22 @@ async function resolveProxyResponse(
 
   const body = decodeBody(payload.body, payload.body_encoding);
   const method = (payload.method ?? "GET").toUpperCase();
-  const dedupeParams: DedupeParams = { target_url: payload.target_url, method, headers: payload.headers, body };
+  let preparedProfile: ReturnType<typeof prepareProxyProfileRequestV1> | undefined;
+  try {
+    preparedProfile = payload.profile
+      ? prepareProxyProfileRequestV1(payload.profile, payload.target_url, method, payload.headers)
+      : undefined;
+  } catch (err) {
+    return { type: "error", code: "bad_request", message: errorMessage(err) };
+  }
+  const profileHash = preparedProfile?.profile_hash;
+  const dedupeParams: DedupeParams = {
+    target_url: payload.target_url,
+    method,
+    headers: preparedProfile?.headers ?? payload.headers,
+    body,
+    profile_hash: profileHash,
+  };
 
   try {
     verifyRequestTicket({
@@ -161,7 +184,13 @@ async function resolveProxyResponse(
 
   try {
     const serve = deps.serve ?? defaultServe;
-    const result = await serve({ target_url: payload.target_url, method, headers: payload.headers, body });
+    const result = await serve({
+      target_url: payload.target_url,
+      method,
+      headers: preparedProfile?.headers ?? payload.headers,
+      body,
+      profile: preparedProfile?.profile,
+    });
     return {
       type: "proxy_response",
       status: result.status,
@@ -169,6 +198,8 @@ async function resolveProxyResponse(
       headers: result.headers,
       body: result.body.toString("base64"),
       body_encoding: "base64",
+      cached: result.cached,
+      profile_hash: result.profile_hash,
     };
   } catch (err) {
     return { type: "error", code: "upstream_error", message: errorMessage(err) };

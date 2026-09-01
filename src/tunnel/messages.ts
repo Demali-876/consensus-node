@@ -1,3 +1,5 @@
+import type { ProxyExecutionProfileV1 } from "../runtime/profile-v1";
+
 export const TUNNEL_MODE = {
   EVAL:    "eval",
   CONTROL: "control",
@@ -138,6 +140,7 @@ export interface ProxyRequestMessage extends BaseMessage {
   headers?: Record<string, string>;
   body?: string;
   body_encoding?: "utf8" | "base64";
+  profile?: ProxyExecutionProfileV1;
 }
 
 export interface ProxyResponseMessage extends BaseMessage {
@@ -148,6 +151,8 @@ export interface ProxyResponseMessage extends BaseMessage {
   headers?: Record<string, string>;
   body?: string;
   body_encoding?: "utf8" | "base64";
+  cached?: boolean;
+  profile_hash?: string;
 }
 
 export interface StreamOpenMessage extends BaseMessage {

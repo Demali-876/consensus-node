@@ -124,13 +124,12 @@ const TARGET_URL = "https://upstream.example.com/api/v1/resource?b=2&a=1";
 // eviction is O(1) amortized — but rotation still keeps the measured cost steady.)
 const REPLAY_ROTATE_ITERATIONS = 50_000;
 
-// Realistic scoped GET: `accept`/`content-type` exercise the semantic-header
-// canonicalization, `x-api-key` forces the scope hash, the rest is passthrough.
+// Realistic GET: `accept`/`content-type` exercise semantic-header
+// canonicalization while user-agent remains non-semantic passthrough metadata.
 const REQUEST_HEADERS: Record<string, string> = {
   accept: "application/json",
   "content-type": "application/json",
   "user-agent": "consensus-bench/1.0",
-  "x-api-key": "bench-scope-key",
 };
 
 const STAGE_NAMES: CompositeStageName[] = [

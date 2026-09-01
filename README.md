@@ -212,4 +212,24 @@ scripts/install-release.sh
 `scripts/ensure-pm2.sh` installs missing macOS dependencies in order:
 Homebrew, Node.js/npm, then PM2. It also persists Homebrew shell setup in
 `~/.zprofile` when Homebrew is installed or discovered outside `PATH`. The older
-`launchd/` and `systemd/` templates are still available if you do not want PM2.
+A `systemd/` template is still available if you do not want PM2.
+
+### Running headless (starts at boot, no login)
+
+```bash
+sudo scripts/install-launchd.sh
+```
+
+macOS only; on Linux install `systemd/consensus-node.service` instead. This installs a
+**LaunchDaemon**, not a LaunchAgent — agents load only once a user logs in, which is why
+`pm2 startup` is not used here. Before enabling the unit it runs `bun run secrets:check`
+as the account the daemon will run as, and refuses to install if that account cannot
+read the encryption data key without a login.
+
+Two prerequisites for a truly headless node:
+
+- **FileVault must be off.** It halts the boot at a pre-boot unlock prompt, so nothing
+  runs until someone types the password. For planned reboots on a FileVault machine,
+  `sudo fdesetup authrestart` boots once unattended, but power loss still needs a human.
+- **Automatic restart after a power cut**, so the machine comes back at all:
+  `sudo pmset -a autorestart 1` (and `sudo pmset -a sleep 0` to stop it sleeping).

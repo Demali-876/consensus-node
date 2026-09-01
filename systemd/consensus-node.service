@@ -10,7 +10,11 @@ Environment=CONSENSUS_SERVER_URL=https://consensus.canister.software
 Environment=CONSENSUS_STATE_DIR=/var/lib/consensus-node/state
 Environment=CONSENSUS_NODE_INSTALL_DIR=/opt/consensus-node
 Environment=CONSENSUS_NODE_UPDATE_COMMAND=/opt/consensus-node/current/scripts/install-release.sh
-ExecStart=/opt/consensus-node/current/scripts/run-node.sh
+# supervise.ts runs under its `#!/usr/bin/env bun` shebang, so bun must be on the
+# unit's PATH. systemd's default PATH omits it; %h expands to the home of whichever
+# user the unit runs as, which is where ensure-bun.sh installs bun ($HOME/.bun/bin).
+Environment=PATH=%h/.bun/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+ExecStart=/opt/consensus-node/current/src/supervise.ts
 Restart=always
 RestartSec=5
 KillSignal=SIGTERM
