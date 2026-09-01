@@ -134,7 +134,14 @@ echo "  bun:         ${bun_bin}"
 echo "  install dir: ${install_dir}"
 echo "  state dir:   ${state_dir}"
 echo
-echo "Status: sudo launchctl print system/${LABEL}"
-echo "Logs:   tail -f ${state_dir}/launchd.err.log"
+echo "Status:  sudo scripts/node-service.sh status"
+echo "Restart: sudo scripts/node-service.sh restart"
+echo "Logs:    scripts/node-service.sh logs"
 echo
-echo "It now starts at boot with no login required. Verify with a reboot."
+echo "It should now start at boot with no login required. To PROVE that:"
+echo "  1. reboot"
+echo "  2. do NOT log in — connect over SSH instead"
+echo "  3. sudo scripts/node-service.sh verify"
+echo
+echo "verify reports PROVEN only if the running process started within seconds of"
+echo "boot, which cannot happen if it waited for a login."

@@ -233,3 +233,21 @@ Two prerequisites for a truly headless node:
   `sudo fdesetup authrestart` boots once unattended, but power loss still needs a human.
 - **Automatic restart after a power cut**, so the machine comes back at all:
   `sudo pmset -a autorestart 1` (and `sudo pmset -a sleep 0` to stop it sleeping).
+
+### Operating and proving it
+
+```bash
+sudo scripts/node-service.sh verify    # readiness checks + headless proof
+sudo scripts/node-service.sh restart   # force a restart of the running unit
+sudo scripts/node-service.sh status
+scripts/node-service.sh logs
+```
+
+`verify` does not assume the node is headless because a plist exists — it checks how
+long after boot the running process started. A process that came up seconds after
+boot cannot have waited for a login, so it reports **PROVEN**. To make that
+conclusive, reboot and run it over SSH **without logging in**; if you log in first,
+the check still passes but proves less.
+
+It also fails loudly when FileVault is on, since no daemon configuration can work
+around a pre-boot unlock prompt.
