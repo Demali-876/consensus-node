@@ -136,12 +136,14 @@ echo "  state dir:   ${state_dir}"
 echo
 echo "Status:  sudo scripts/node-service.sh status"
 echo "Restart: sudo scripts/node-service.sh restart"
+echo "Ping:    scripts/node-service.sh ping"
 echo "Logs:    scripts/node-service.sh logs"
 echo
-echo "It should now start at boot with no login required. To PROVE that:"
-echo "  1. reboot"
-echo "  2. do NOT log in — connect over SSH instead"
-echo "  3. sudo scripts/node-service.sh verify"
+echo "This is a LaunchDaemon, so it starts at boot without a login (unlike"
+echo "\`pm2 startup\`, which writes a login-gated LaunchAgent on macOS)."
 echo
-echo "verify reports PROVEN only if the running process started within seconds of"
-echo "boot, which cannot happen if it waited for a login."
+echo "Check it end to end now:"
+echo "  sudo scripts/node-service.sh restart"
+echo
+echo "That relaunches the unit and waits for the orchestrator to report this node"
+echo "active again — the node is not really back until the orchestrator sees it."

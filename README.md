@@ -237,34 +237,21 @@ Two prerequisites for a truly headless node:
 ### Operating and proving it
 
 ```bash
-sudo scripts/node-service.sh verify    # readiness checks + headless proof
-sudo scripts/node-service.sh restart   # force a restart of the running unit
+sudo scripts/node-service.sh restart   # relaunch, then wait for the node to serve
 sudo scripts/node-service.sh status
+scripts/node-service.sh ping           # is the orchestrator seeing this node?
 scripts/node-service.sh logs
 ```
 
-`verify` is strict about what counts as proof. Elapsed time since boot is **not**
-proof — an operator (or automatic login) can log in seconds after boot and start the
-service by hand, and no time window can tell that apart from a boot-triggered start.
+`restart` relaunches the unit and then waits for the **orchestrator** to report this
+node `active` again. That distinction matters: a live pid only says the unit
+relaunched, while the orchestrator confirms the node reconnected and is serving.
+`ping` asks the same question on its own.
 
-What it requires instead is that **no console login exists on this boot** while the
-service is running. If nobody has logged in and the node is up, it demonstrably did
-not need a login. So the procedure is:
-
-1. reboot
-2. do **not** log in
-3. connect over SSH
-4. `sudo scripts/node-service.sh verify`
-
-If you are logged in at the console it reports *unproven* and says why, rather than
-passing on weak evidence.
-
-`verify` also asks the orchestrator whether this node is actually `active` — a
-running process only proves the unit started, not that the node reconnected and is
-serving. `restart` waits for that same signal before reporting success.
-
-It fails loudly when FileVault is on, since no daemon configuration can work around a
-pre-boot unlock prompt.
+There is deliberately no command that claims to prove the node started *before* a
+login. Whether a given start was pre- or post-login is not something the machine can
+report reliably after the fact, so the check that earns its keep is operational —
+restart it and confirm it comes back and serves.
 
 Existing nodes that predate the boot unit do not need the wizard: the supervisor logs
 `headless-boot-NOT-configured` at startup and `/health` reports `headless_boot`, so an

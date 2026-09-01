@@ -691,7 +691,7 @@ async function headlessStatus(): Promise<Record<string, unknown>> {
     plist,
     fileVaultOn,
     installCommand: `sudo ${path.join(dir, "current", "scripts", "install-launchd.sh")}`,
-    verifyCommand: `sudo ${path.join(dir, "current", "scripts", "node-service.sh")} verify`,
+    restartCommand: `sudo ${path.join(dir, "current", "scripts", "node-service.sh")} restart`,
     ready: daemonInstalled && fileVaultOn !== true,
   };
 }

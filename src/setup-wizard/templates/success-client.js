@@ -61,7 +61,7 @@
       if (!response.ok) throw new Error(body.error || "Could not read headless status");
 
       if (body.installCommand) byId("headless-install-cmd").textContent = body.installCommand;
-      if (body.verifyCommand) byId("headless-verify-cmd").textContent = body.verifyCommand;
+      if (body.restartCommand) byId("headless-restart-cmd").textContent = body.restartCommand;
 
       if (body.platform !== "darwin") {
         statusEl.className = "env-status mono pending";
@@ -83,7 +83,7 @@
       }
       statusEl.className = "env-status mono ok";
       statusEl.textContent = "Installed";
-      detail.textContent = "Boot service installed. To prove it: reboot, do NOT log in, connect over SSH, and run the verify command.";
+      detail.textContent = "Boot service installed — this node starts at boot without a login. Use the restart command any time to relaunch it and confirm the orchestrator sees it come back.";
     } catch (error) {
       statusEl.className = "env-status mono err";
       statusEl.textContent = "Unknown";
