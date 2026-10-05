@@ -4,6 +4,8 @@ Verifiable Bun worker node runtime for the [Consensus Protocol](https://github.c
 
 **Part of Consensus:** [consensus](https://github.com/Demali-876/consensus) (orchestrator/server) · [consensus-client](https://github.com/Demali-876/consensus-client) (CLI + SDK) · **consensus-node** (this repo).
 
+**Documentation:** [docs.consensus.canister.software](https://docs.consensus.canister.software) · [Run a node](https://docs.consensus.canister.software/join/) · [Node setup guide](https://docs.consensus.canister.software/guides/node/) · [Requirements](https://docs.consensus.canister.software/nodes/requirements/)
+
 This runtime is built from scratch and is separate from the `instance/` reference implementation that lives in the `consensus` monorepo.
 
 > **Architecture direction (in progress):** the data path is moving so clients connect **directly to nodes** instead of the orchestrator relaying everything over the control tunnel. The orchestrator stays the control plane (auth, x402 payment, node selection, signed tickets); each node will host its own reachable data endpoint, enforce SSRF locally (the `consensus` SSRF guard is being ported into this runtime), and keep a per-node cache. Until that lands, nodes serve work over the encrypted control tunnel as described below.
